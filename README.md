@@ -23,9 +23,9 @@ Abre la PWA (en HTTPS, o por HTTP en la misma Wi‑Fi), elige un PDF o imagen, s
 
 ## Versión y acceso
 
-Versión actual: **V4** — https://rserrano285-svg.github.io/PDF-Image-Translator-IOS/V4/
+Versión actual: **V5** — https://rserrano285-svg.github.io/PDF-Image-Translator-IOS/V5/
 
-Convención RS App: cada versión vive en su carpeta (`V1`, `V2`, `V3`, `V4`, ...); la raíz redirige a la última. Las versiones anteriores redirigen a V4.
+Convención RS App: cada versión vive en su carpeta (`V1`...`V5`); la raíz redirige a la última. Las versiones anteriores redirigen a V5.
 
 ## Apoyo
 
