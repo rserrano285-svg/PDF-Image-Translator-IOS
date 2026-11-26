@@ -21,6 +21,12 @@ Abre la PWA (en HTTPS, o por HTTP en la misma Wi‑Fi), elige un PDF o imagen, s
 - Los modelos de OCR y las librerías se descargan la primera vez y se guardan en caché; iOS puede liberar esa memoria si faltara espacio.
 - No hay servidor ni cuentas: no se guarda nada en la nube.
 
+## Versión y acceso
+
+Versión actual: **V1** — https://rserrano285-svg.github.io/PDF-Image-Translator-IOS/V1/
+
+Convención: cada versión se publica en su propia carpeta (`V1`, `V2`, ...). La URL raíz redirige a la última versión, así que los cambios futuros no rompen el enlace. Instálala en el iPhone desde esa URL con *Compartir → Agregar a pantalla de inicio*.
+
 ## Apoyo
 
 Gratuita y de código abierto. Si te sirve: [PayPal (rene285serrano)](https://paypal.me/rene285serrano).
