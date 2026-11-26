@@ -73,6 +73,7 @@
     const langSelect = $('lang');
     const translateBtn = $('translate');
     const previewBox = $('preview');
+    const resultBox = $('result');
     const downloadLink = $('download');
     const shareBtn = $('share');
     let lastFile = null;
@@ -250,7 +251,8 @@
     fileInput.addEventListener('change', () => {
       const f = fileInput.files[0];
       $('file-info').innerHTML = f ? `<div class="file"><b>${f.name}</b><small>${fmtSize(f.size)} · ${detectKind(f)==='pdf'?'PDF':'Imagen'}</small></div>` : 'Toca para elegir un PDF o una imagen';
-      previewBox.innerHTML=''; downloadLink.style.display='none'; showMsg('');
+      previewBox.innerHTML=''; downloadLink.style.display='none'; shareBtn.style.display='none';
+      resultBox.classList.remove('on'); showMsg('');
     });
 
     translateBtn.addEventListener('click', async () => {
@@ -262,12 +264,10 @@
         const result = detectKind(f)==='pdf' ? await translatePdf(f, langSelect.value) : await translateImage(f, langSelect.value);
         const url = URL.createObjectURL(result.blob);
         previewBox.innerHTML = result.previews.map((src,i)=>`<img class="preview" src="${src}" alt="Página ${i+1}">`).join('');
+        resultBox.classList.add('on');
         lastFile = new File([result.blob], result.name, { type: result.blob.type });
-        const canShare = navigator.share && navigator.canShare && navigator.canShare({ files: [lastFile] });
-        shareBtn.style.display = canShare ? 'inline-flex' : 'none';
-        if (!canShare) {
-          downloadLink.href = url; downloadLink.download = result.name; downloadLink.style.display = 'inline-flex';
-        }
+        shareBtn.style.display = navigator.share ? 'inline-flex' : 'none';
+        downloadLink.href = url; downloadLink.download = result.name; downloadLink.style.display = 'inline-flex';
         setOrientation(detectKind(f));
         showMsg(detectKind(f) === 'image'
           ? 'Listo. Pulsa Compartir y elige Guardar imagen en Fotos.'
