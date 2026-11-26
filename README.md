@@ -23,7 +23,7 @@ Abre la PWA (en HTTPS, o por HTTP en la misma Wi‑Fi), elige un PDF o imagen, s
 
 ## Versión y acceso
 
-Versión actual: **V1** — https://rserrano285-svg.github.io/PDF-Image-Translator-IOS/V1/
+Versión actual: **V2** — https://rserrano285-svg.github.io/PDF-Image-Translator-IOS/V2/
 
 Convención: cada versión se publica en su propia carpeta (`V1`, `V2`, ...). La URL raíz redirige a la última versión, así que los cambios futuros no rompen el enlace. Instálala en el iPhone desde esa URL con *Compartir → Agregar a pantalla de inicio*.
 
