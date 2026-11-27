@@ -1,4 +1,4 @@
-const CACHE = 'pdf-image-translator-ios-v5';
+const CACHE = 'pdf-image-translator-ios-v7';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -21,11 +21,28 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const req = event.request;
+
+  // Navegación y HTML: network-first, para que los arreglos se vean sin limpiar caché.
+  if (req.mode === 'navigate' || new URL(req.url).pathname.endsWith('/index.html')) {
+    event.respondWith(
+      fetch(req).then((response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(req, copy));
+        }
+        return response;
+      }).catch(() => caches.match(req).then((cached) => cached || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // Resto de archivos: cache-first (CDN, iconos, etc.).
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-      if (response.ok && event.request.url.startsWith('https://cdn.jsdelivr.net')) {
+    caches.match(req).then((cached) => cached || fetch(req).then((response) => {
+      if (response.ok && req.url.startsWith('https://cdn.jsdelivr.net')) {
         const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        caches.open(CACHE).then((cache) => cache.put(req, copy));
       }
       return response;
     }))

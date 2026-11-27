@@ -36,6 +36,9 @@
   .file{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;color:var(--ink)}
   .file small{color:var(--muted)}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
+  .field span{font-size:.72rem;color:var(--muted)}
+  .field select{width:100%;min-width:0}
   select{flex:1;min-width:150px;padding:.65rem .8rem;border-radius:11px;border:1px solid var(--line);background:var(--glass2);color:var(--ink)}
   .progress{display:none;margin-top:12px}
   .progress.on{display:block}
@@ -67,15 +70,26 @@
       ['pt','Portugués'],['nl','Neerlandés'],['pl','Polaco'],['ru','Ruso'],['zh','Chino'],
       ['ja','Japonés'],['ko','Coreano'],['ar','Árabe'],['tr','Turco'],['hi','Hindi'],['sv','Sueco']
     ];
+    // Idioma de origen: "auto" detecta el idioma; si se elige uno, se usa también para el OCR.
+    const SOURCE_LANGUAGES = LANGUAGES.map(([code, name]) => [code, name]);
+    SOURCE_LANGUAGES.unshift(['auto','Detectar idioma']);
+    // Códigos de Tesseract para el OCR (distintos de los códigos de traducción).
+    const TESS_LANG = {
+      es:'spa', en:'eng', fr:'fra', de:'deu', it:'ita', pt:'por', nl:'nld', pl:'pol',
+      ru:'rus', zh:'chi_sim', ja:'jpn', ko:'kor', ar:'ara', tr:'tur', hi:'hin', sv:'swe'
+    };
 
     const $ = (id) => document.getElementById(id);
     const fileInput = $('file');
     const langSelect = $('lang');
+    const sourceSelect = $('source');
     const translateBtn = $('translate');
     const previewBox = $('preview');
     const resultBox = $('result');
     const shareBtn = $('share');
+    const downloadLink = $('download');
     let lastFile = null;
+    let lastUrl = null;
     const progressBox = $('progress');
     const orientacion = $('orientacion');
     function setOrientation(kind) {
@@ -86,11 +100,18 @@
     const progressText = $('progress-text');
     const msg = $('msg');
 
+    // Destino por defecto: español. El usuario puede cambiarlo si lo desea.
     for (const [code, name] of LANGUAGES) {
       const o = document.createElement('option');
       o.value = code; o.textContent = name;
       if (code === 'es') o.selected = true;
       langSelect.appendChild(o);
+    }
+    for (const [code, name] of SOURCE_LANGUAGES) {
+      const o = document.createElement('option');
+      o.value = code; o.textContent = name;
+      if (code === 'auto') o.selected = true;
+      sourceSelect.appendChild(o);
     }
 
     function detectKind(file) {
@@ -103,7 +124,7 @@
     function hideProgress() { progressBox.classList.remove('on'); }
 
     // ---- Traducción (misma API del app de Windows; funciona desde el navegador) ----
-    async function translateText(text, to) {
+    async function translateText(text, to, from) {
       if (!text.trim()) return '';
       const words = text.split(/\s+/).filter(Boolean);
       const chunks = [];
@@ -115,7 +136,8 @@
       if (cur) chunks.push(cur);
       const out = [];
       for (const chunk of chunks) {
-        const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=auto&tl=${to}&dt=t&q=${encodeURIComponent(chunk)}`;
+        const sl = from || 'auto';
+        const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${to}&dt=t&q=${encodeURIComponent(chunk)}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('No se pudo traducir (' + res.status + '). Revisa tu conexión.');
         const data = await res.json();
@@ -159,13 +181,70 @@
       ctx.fillText(text, x, baseline);
     }
 
+    // ---- OCR multilingüe: se reutiliza un worker por conjunto de idiomas ----
+    let ocrWorkerPromise = null;
+    let ocrWorkerKey = '';
+    function ocrLangs() {
+      const code = sourceSelect.value;
+      // "auto" carga varios idiomas frecuentes; elegir el idioma exacto
+      // mejora la precisión y reduce la descarga inicial.
+      return code === 'auto' ? ['eng','spa','fra','deu','ita','por'] : [TESS_LANG[code] || 'eng'];
+    }
+    async function getOcrWorker(langs) {
+      if (!window.Tesseract) throw new Error('El OCR no está disponible (falta conexión a internet).');
+      const key = langs.join('+');
+      if (ocrWorkerPromise && ocrWorkerKey !== key) {
+        ocrWorkerPromise.then((w) => w.terminate()).catch(() => {});
+        ocrWorkerPromise = null;
+      }
+      if (!ocrWorkerPromise) {
+        ocrWorkerKey = key;
+        ocrWorkerPromise = Tesseract.createWorker(langs).catch((e) => {
+          ocrWorkerPromise = null;
+          throw e;
+        });
+      }
+      return ocrWorkerPromise;
+    }
+    function ocrLines(data, width) {
+      const out = [];
+      for (const it of (data && (data.lines || data.words)) || []) {
+        const str = (it.text || '').replace(/\s+/g, ' ').trim();
+        if (!str) continue;
+        const b = it.bbox || {};
+        const x = Number(b.x0) || 0;
+        const y0 = Number(b.y0) || 0;
+        const x1 = Number(b.x1) || Math.min(width, x + width / 2);
+        const y1 = Number(b.y1) || Math.min(width, y0 + 12);
+        out.push({ str, x, y: y1, w: Math.max(1, x1 - x), h: Math.max(1, y1 - y0) });
+      }
+      if (!out.length && data && data.text) {
+        data.text.split(/\n+/).map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+          .forEach((str, i) => out.push({ str, x: 8, y: 24 + i * 18, w: Math.max(1, width - 16), h: 16 }));
+      }
+      return out;
+    }
+    function wrapText(ctx, text, maxWidth) {
+      const lines = [];
+      let cur = '';
+      for (const w of text.split(/\s+/).filter(Boolean)) {
+        const test = cur ? cur + ' ' + w : w;
+        if (cur && ctx.measureText(test).width > maxWidth) { lines.push(cur); cur = w; }
+        else cur = test;
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    }
+
     // ---- PDF: renderizar, tapar el texto original y dibujar la traducción ----
     async function translatePdf(file, to) {
+      const from = sourceSelect.value === 'auto' ? '' : sourceSelect.value;
       const bytes = new Uint8Array(await file.arrayBuffer());
       const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
       const total = Math.min(doc.numPages, MAX_PAGES);
       if (doc.numPages > MAX_PAGES) showMsg(`El PDF tiene ${doc.numPages} páginas; se traducen las primeras ${MAX_PAGES} (límite en iPhone).`, 'error');
       const pages = [];
+      let candidates = 0, changed = 0, ocrUsed = false;
       for (let n = 1; n <= total; n++) {
         setProgress(`Procesando página ${n} de ${total}…`);
         const page = await doc.getPage(n);
@@ -189,7 +268,7 @@
         }
         // agrupar en líneas
         raw.sort((a,b)=>b.y-a.y || a.x-b.x);
-        const lines=[];
+        let lines=[];
         for (const it of raw) {
           const cur=lines[lines.length-1];
           if (cur && Math.abs(cur.y-it.y)<=Math.max(2,cur.h*.35) && it.x-(cur.x+cur.w)<=Math.max(10,cur.h*2.5)) {
@@ -197,10 +276,21 @@
             cur.str += ' ' + it.str;
           } else lines.push({...it});
         }
+        // PDF escaneado: no hay texto útil en la capa del PDF, reconocerlo con OCR.
+        if (!lines.some((l) => /\p{L}/u.test(l.str))) {
+          setProgress(`Reconociendo texto de la página ${n}…`);
+          const worker = await getOcrWorker(ocrLangs());
+          const { data } = await worker.recognize(canvas);
+          lines = ocrLines(data, canvas.width);
+          if (!lines.length) throw new Error(`No se encontró texto legible en la página ${n}.`);
+          ocrUsed = true;
+        }
         for (const line of lines) {
-          if (!/[A-Za-zÀ-ÿ]/.test(line.str)) continue;
-          const t = await translateText(line.str, to);
+          if (!/\p{L}/u.test(line.str)) continue;
+          candidates++;
+          const t = await translateText(line.str, to, from);
           if (!t.trim() || t.trim() === line.str.trim()) continue;
+          changed++;
           const bg = sampleBg(ctx, line.x, line.y-line.h, line.w, line.h*1.2);
           ctx.fillStyle = bg;
           ctx.fillRect(line.x-1, line.y-line.h*1.02, line.w+2, line.h*1.35);
@@ -216,11 +306,16 @@
         page.drawImage(png, { x:0, y:0, width:p.w, height:p.h });
       }
       const bytesOut = await pdfDoc.save();
-      return { blob: new Blob([bytesOut], {type:'application/pdf'}), name: file.name.replace(/\.pdf$/i,'')+'_traducido.pdf', previews: pages.map(p=>p.img) };
+      let notice = null;
+      if (ocrUsed) notice = { text: 'PDF escaneado: se aplicó OCR antes de traducir.', cls: 'ok' };
+      if (candidates && !changed) notice = { text: 'No se detectaron cambios. Revisa el idioma de origen/destino o si el archivo tiene texto legible.', cls: 'error' };
+      if (from && from === to) notice = { text: 'El idioma de origen y el de destino son el mismo. Elige otro idioma de destino.', cls: 'error' };
+      return { blob: new Blob([bytesOut], {type:'application/pdf'}), name: file.name.replace(/\.pdf$/i,'')+'_traducido.pdf', previews: pages.map(p=>p.img), notice };
     }
 
     // ---- Imagen: OCR + traducción ----
     async function translateImage(file, to) {
+      const from = sourceSelect.value === 'auto' ? '' : sourceSelect.value;
       setProgress('Reconociendo texto…');
       const img = await loadImage(file);
       const canvas = document.createElement('canvas');
@@ -228,29 +323,34 @@
       canvas.height = img.naturalHeight || img.height || 600;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(img, 0, 0);
-      if (!window.Tesseract) throw new Error('El OCR no está disponible (falta conexión).');
-      const worker = await Tesseract.createWorker('eng');
+      const worker = await getOcrWorker(ocrLangs());
       const { data } = await worker.recognize(canvas);
-      await worker.terminate();
       const original = (data.text || '').trim();
       if (!original) throw new Error('No se encontró texto en la imagen.');
       setProgress('Traduciendo…');
-      const translated = await translateText(original, to);
-      const lines = translated.split(/\n/).filter(Boolean).slice(0,12);
+      const translated = await translateText(original, to, from);
       const size = Math.max(12, Math.round(canvas.width/45));
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillRect(0,0,canvas.width, Math.min(canvas.height, lines.length*size*1.4+10));
       ctx.font = `bold ${size}px sans-serif`;
+      let lines = wrapText(ctx, translated, canvas.width - 16);
+      const maxLines = Math.max(1, Math.floor((canvas.height - 8) / (size * 1.35)));
+      if (lines.length > maxLines) lines = lines.slice(0, maxLines);
+      const blockH = Math.min(canvas.height, lines.length * size * 1.35 + 10);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fillRect(0, 0, canvas.width, blockH);
       ctx.fillStyle = '#111';
-      lines.forEach((l,i)=>ctx.fillText(l, 8, size+8+i*size*1.35));
+      lines.forEach((l, i) => ctx.fillText(l, 8, size + i * size * 1.35));
+      let notice = translated.trim() === original.trim()
+        ? { text: 'No se detectaron cambios. Revisa el idioma de origen/destino.', cls: 'error' }
+        : null;
+      if (from && from === to) notice = { text: 'El idioma de origen y el de destino son el mismo. Elige otro idioma de destino.', cls: 'error' };
       const blob = await new Promise((res)=>canvas.toBlob(res, file.type || 'image/png'));
-      return { blob, name: file.name, previews: [canvas.toDataURL('image/png')] };
+      return { blob, name: file.name, previews: [canvas.toDataURL('image/png')], notice };
     }
 
     fileInput.addEventListener('change', () => {
       const f = fileInput.files[0];
       $('file-info').innerHTML = f ? `<div class="file"><b>${f.name}</b><small>${fmtSize(f.size)} · ${detectKind(f)==='pdf'?'PDF':'Imagen'}</small></div>` : 'Toca para elegir un PDF o una imagen';
-      previewBox.innerHTML=''; shareBtn.style.display='none';
+      previewBox.innerHTML=''; shareBtn.style.display='none'; downloadLink.style.display='none';
       resultBox.classList.remove('on'); showMsg('');
     });
 
@@ -261,15 +361,31 @@
       msg.textContent='';
       try {
         const result = detectKind(f)==='pdf' ? await translatePdf(f, langSelect.value) : await translateImage(f, langSelect.value);
+        if (lastUrl) URL.revokeObjectURL(lastUrl);
         const url = URL.createObjectURL(result.blob);
+        lastUrl = url;
         previewBox.innerHTML = result.previews.map((src,i)=>`<img class="preview" src="${src}" alt="Página ${i+1}">`).join('');
         resultBox.classList.add('on');
         lastFile = new File([result.blob], result.name, { type: result.blob.type });
-        shareBtn.style.display = navigator.share ? 'inline-flex' : 'none';
+        const canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [lastFile] }));
+        shareBtn.style.display = canShare ? 'inline-flex' : 'none';
+        if (canShare) {
+          downloadLink.style.display = 'none';
+        } else {
+          downloadLink.href = url;
+          downloadLink.download = result.name;
+          downloadLink.style.display = 'inline-flex';
+        }
         setOrientation(detectKind(f));
-        showMsg(detectKind(f) === 'image'
-          ? 'Listo. Pulsa Compartir y elige Guardar imagen en Fotos.'
-          : 'Listo. Pulsa Compartir y elige Guardar en Archivos (iOS no permite guardar PDFs en Fotos).', 'ok');
+        if (result.notice) {
+          showMsg(result.notice.text, result.notice.cls);
+        } else {
+          showMsg(canShare
+            ? (detectKind(f) === 'image'
+              ? 'Listo. Pulsa Compartir y elige Guardar imagen en Fotos.'
+              : 'Listo. Pulsa Compartir y elige Guardar en Archivos (iOS no permite guardar PDFs en Fotos).')
+            : 'Listo. Pulsa «Descargar archivo traducido» para guardarlo.', 'ok');
+        }
       } catch (e) {
         showMsg(e.message || String(e), 'error');
       } finally { hideProgress(); translateBtn.disabled=false; }
@@ -303,7 +419,8 @@
         <span id="file-info">Toca para elegir un PDF o una imagen</span>
       </label>
       <div class="row">
-        <select id="lang" aria-label="Idioma de destino"></select>
+        <label class="field"><span>Idioma del archivo</span><select id="source" aria-label="Idioma del archivo"></select></label>
+        <label class="field"><span>Traducir a</span><select id="lang" aria-label="Idioma de destino"></select></label>
         <button class="btn" id="translate">Traducir</button>
       </div>
       <div class="progress" id="progress"><div class="bar"><i></i></div><p class="msg" id="progress-text"></p></div>
@@ -316,12 +433,13 @@
       <div id="preview"></div>
       <div class="actions">
         <button class="btn" id="share" type="button" style="display:none">Compartir / Guardar</button>
+        <a class="btn" id="download" href="#" download style="display:none">Descargar archivo traducido</a>
       </div>
-      <p class="hint">El archivo se genera en el navegador y no se sube a ningún servidor. No se guarda nada en carpetas del proyecto. Imágenes: guárdalas en Fotos desde Compartir. PDF: guárdalo en Archivos (iOS no permite PDFs en Fotos).</p>
+      <p class="hint">El archivo se genera en el navegador y no se sube a ningún servidor. En iOS usa Compartir para guardarlo; en escritorio u otros navegadores usa el botón Descargar. Elige el idioma del archivo (o «Detectar idioma») y el destino, que por defecto es Español. Los PDFs escaneados e imágenes se reconocen con OCR multilingüe antes de traducirse; la primera vez descarga datos de idioma (requiere internet).</p>
     </section>
 
     <footer>
-      <span>PDF Image Translator IOS V2 · Código abierto · Todo se procesa en tu dispositivo</span>
+      <span>PDF Image Translator IOS V5 · Código abierto · Todo se procesa en tu dispositivo</span>
       <span><a href="https://github.com/rserrano285-svg/PDF-Image-Translator-IOS" target="_blank" rel="noopener noreferrer">Repositorio en GitHub</a> · <a href="https://paypal.me/rene285serrano" target="_blank" rel="noopener noreferrer">Donar / Apoyar El Proyecto ♥</a></span>
     </footer>
   </main>
