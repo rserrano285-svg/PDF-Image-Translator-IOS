@@ -1,4 +1,4 @@
-# PDF Image Translator IOS - V7
+# PDF Image Translator IOS
 
 PWA independiente para **iPhone** que traduce **PDFs e imágenes conservando el formato original**. Todo se procesa en el navegador del teléfono: el archivo no se sube a ningún servidor.
 
@@ -23,9 +23,9 @@ Abre la PWA (en HTTPS, o por HTTP en la misma Wi‑Fi), elige un PDF o imagen, s
 
 ## Versión y acceso
 
-Versión actual: **V7** — https://rserrano285-svg.github.io/PDF-Image-Translator-IOS/V7/
+Versión actual: ver [CHANGELOG.md](CHANGELOG.md) y las notas de release del repositorio — https://rserrano285-svg.github.io/PDF-Image-Translator-IOS/V8/
 
-Convención RS App: cada versión vive en su carpeta (`V1`...`V7`); la raíz y el `404.html` redirigen a la última. Las versiones anteriores se conservan y siguen accesibles por su ruta (`V6` sirve como respaldo).
+Convención RS App: cada versión vive en su carpeta (`V1`...`V8`); la raíz y el `404.html` redirigen a la última. Las versiones anteriores se conservan y siguen accesibles por su ruta (`V7` sirve como respaldo).
 
 Los cambios de cada versión están en [CHANGELOG.md](CHANGELOG.md).
 
