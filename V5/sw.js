@@ -1,4 +1,4 @@
-const CACHE = 'pdf-image-translator-ios-v9';
+const CACHE = 'pdf-image-translator-ios-v10';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
