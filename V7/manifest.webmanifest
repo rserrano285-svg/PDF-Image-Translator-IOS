@@ -1,0 +1,14 @@
+{
+  "name": "PDF Image Translator IOS V7",
+  "short_name": "PDF Translator V7",
+  "description": "Traduce PDFs e imágenes conservando el formato, en tu iPhone",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f6fc",
+  "theme_color": "#f2f6fc",
+  "icons": [
+    { "src": "icon-192-v7.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512-v7.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

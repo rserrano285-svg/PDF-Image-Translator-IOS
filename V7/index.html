@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta name="theme-color" content="#f2f6fc">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="PDF Translator">
+  <meta name="application-name" content="PDF Image Translator IOS">
+  <meta name="description" content="Traduce PDFs e imágenes en tu iPhone conservando el formato original.">
+  <title>PDF Image Translator IOS V7</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="apple-touch-icon-v7.png">
+  <style>
+  :root{--brand:#3b82f6;--brand2:#2563eb;--glass:rgba(255,255,255,.72);--glass2:rgba(255,255,255,.92);--line:rgba(15,23,42,.10);--ink:#0f172a;--muted:#64748b;--danger:#dc2626;--ok:#16a34a;color-scheme:light}
+  html[data-theme="dark"]{--brand:#60a5fa;--brand2:#93c5fd;--glass:rgba(255,255,255,.045);--glass2:rgba(255,255,255,.07);--line:rgba(255,255,255,.09);--ink:#e8eef7;--muted:#91a2b8;--danger:#ff6b6b;--ok:#4ade80;color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom);background:radial-gradient(900px 500px at 12% -10%,rgba(59,130,246,.16),transparent 60%),radial-gradient(700px 400px at 100% 0%,rgba(124,58,237,.10),transparent 55%),#f2f6fc}
+  html[data-theme="dark"] body{background:radial-gradient(900px 500px at 12% -10%,rgba(59,130,246,.22),transparent 60%),radial-gradient(700px 400px at 100% 0%,rgba(124,58,237,.13),transparent 55%),#070c14}
+  main{max-width:680px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 0 12px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:46px;height:46px;border-radius:13px;background:linear-gradient(135deg,var(--brand),#7c3aed);display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 24px rgba(59,130,246,.35)}
+  .logo img{width:100%;height:100%;object-fit:contain}
+  h1{font-size:1.15rem;margin:0;display:flex;align-items:center;gap:8px}
+  .version{font-size:.66rem;font-weight:800;color:var(--brand2);background:rgba(59,130,246,.16);border:1px solid rgba(96,165,250,.35);border-radius:99px;padding:.15rem .5rem}
+  .sub{color:var(--muted);font-size:.8rem;margin:2px 0 0}
+  button,select{font:inherit}
+  .btn{border:1px solid var(--line);border-radius:11px;padding:.7rem 1rem;background:linear-gradient(135deg,var(--brand),#2563eb);color:#fff;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(37,99,235,.3)}
+  .btn.secondary{background:var(--glass2);color:var(--ink);box-shadow:none}
+  .btn:disabled{opacity:.45}
+  .card{background:var(--glass);border:1px solid var(--line);border-radius:18px;padding:16px;margin:10px 0;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 45px rgba(15,23,42,.08)}
+  html[data-theme="dark"] .card{box-shadow:0 18px 45px rgba(0,0,0,.3)}
+  .drop{border:1.5px dashed rgba(96,165,250,.45);border-radius:14px;padding:20px 12px;text-align:center;color:var(--muted);background:rgba(59,130,246,.045)}
+  .drop input{display:none}
+  .file{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;color:var(--ink)}
+  .file small{color:var(--muted)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px}
+  .field span{font-size:.72rem;color:var(--muted)}
+  .field select{width:100%;min-width:0}
+  select{flex:1;min-width:150px;padding:.65rem .8rem;border-radius:11px;border:1px solid var(--line);background:var(--glass2);color:var(--ink)}
+  .progress{display:none;margin-top:12px}
+  .progress.on{display:block}
+  .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+  .bar i{display:block;height:100%;width:38%;background:linear-gradient(90deg,var(--brand),#8b5cf6);animation:slide 1.1s linear infinite}
+  @keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(320%)}}
+  .msg{margin-top:8px;color:var(--muted);font-size:.85rem}
+  .error{color:var(--danger)}
+  .ok{color:var(--ok)}
+  .orientation{color:var(--brand2);font-size:.82rem;margin:8px 0 0}
+  .result{display:none}
+  .result.on{display:block}
+  .preview{width:100%;border:1px solid var(--line);border-radius:12px;margin:8px 0;background:#fff}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  a.btn{text-decoration:none;display:inline-flex;align-items:center}
+  footer{display:flex;flex-direction:column;gap:6px;align-items:center;padding:18px 0 26px;color:var(--muted);font-size:.75rem;text-align:center}
+  footer a{color:var(--brand2);text-decoration:none}
+  .hint{font-size:.75rem;color:var(--muted)}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script type="module">
+    import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+
+    const MAX_PAGES = 20;
+    const LANGUAGES = [
+      ['es','Español'],['en','Inglés'],['fr','Francés'],['de','Alemán'],['it','Italiano'],
+      ['pt','Portugués'],['nl','Neerlandés'],['pl','Polaco'],['ru','Ruso'],['zh','Chino'],
+      ['ja','Japonés'],['ko','Coreano'],['ar','Árabe'],['tr','Turco'],['hi','Hindi'],['sv','Sueco']
+    ];
+    // Idioma de origen: "auto" detecta el idioma; si se elige uno, se usa también para el OCR.
+    const SOURCE_LANGUAGES = LANGUAGES.map(([code, name]) => [code, name]);
+    SOURCE_LANGUAGES.unshift(['auto','Detectar idioma']);
+    // Códigos de Tesseract para el OCR (distintos de los códigos de traducción).
+    const TESS_LANG = {
+      es:'spa', en:'eng', fr:'fra', de:'deu', it:'ita', pt:'por', nl:'nld', pl:'pol',
+      ru:'rus', zh:'chi_sim', ja:'jpn', ko:'kor', ar:'ara', tr:'tur', hi:'hin', sv:'swe'
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const fileInput = $('file');
+    const langSelect = $('lang');
+    const sourceSelect = $('source');
+    const fontStyleSelect = $('fontstyle');
+    const translateBtn = $('translate');
+    const previewBox = $('preview');
+    const resultBox = $('result');
+    const shareBtn = $('share');
+    const downloadLink = $('download');
+    let lastFile = null;
+    let lastUrl = null;
+    const progressBox = $('progress');
+    const orientacion = $('orientacion');
+    function setOrientation(kind) {
+      orientacion.textContent = kind === 'pdf'
+        ? 'Orientación detectada automáticamente (horizontal/apaisado o vertical) · PDF ajustado para imprimir.'
+        : 'Imagen conservada en su tamaño original.';
+    }
+    const progressText = $('progress-text');
+    const msg = $('msg');
+
+    // Destino por defecto: español. El usuario puede cambiarlo si lo desea.
+    for (const [code, name] of LANGUAGES) {
+      const o = document.createElement('option');
+      o.value = code; o.textContent = name;
+      if (code === 'es') o.selected = true;
+      langSelect.appendChild(o);
+    }
+    for (const [code, name] of SOURCE_LANGUAGES) {
+      const o = document.createElement('option');
+      o.value = code; o.textContent = name;
+      if (code === 'auto') o.selected = true;
+      sourceSelect.appendChild(o);
+    }
+
+    function detectKind(file) {
+      if ((file.type || '').includes('pdf') || file.name.toLowerCase().endsWith('.pdf')) return 'pdf';
+      return 'image';
+    }
+    function fmtSize(n) { return n < 1048576 ? (n/1024).toFixed(0)+' KB' : (n/1048576).toFixed(1)+' MB'; }
+    function showMsg(text, cls='') { msg.textContent = text; msg.className = 'msg ' + cls; }
+    function setProgress(text) { progressBox.classList.add('on'); progressText.textContent = text; }
+    function hideProgress() { progressBox.classList.remove('on'); }
+
+    // ---- Traducción (misma API del app de Windows; funciona desde el navegador) ----
+    async function translateText(text, to, from) {
+      if (!text.trim()) return '';
+      const words = text.split(/\s+/).filter(Boolean);
+      const chunks = [];
+      let cur = '';
+      for (const w of words) {
+        if (cur && cur.length + w.length > 1700) { chunks.push(cur); cur = ''; }
+        cur += (cur ? ' ' : '') + w;
+      }
+      if (cur) chunks.push(cur);
+      const out = [];
+      for (const chunk of chunks) {
+        const sl = from || 'auto';
+        const q = encodeURIComponent(chunk);
+        let t = '', lastError = '';
+        // 1) Google (clients5)
+        try {
+          const res = await fetch(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${to}&dt=t&q=${q}`);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          if (Array.isArray(data[0])) {
+            t = typeof data[0][0] === 'string' ? data[0][0]
+              : (Array.isArray(data[0][0]) ? data[0][0].map((s) => s[0] || '').join('') : '');
+          } else if (typeof data[0] === 'string') t = data[0];
+        } catch (e) { lastError = e.message || String(e); }
+        // 2) Google (translate.googleapis.com)
+        if (!t.trim()) {
+          try {
+            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${to}&dt=t&q=${q}`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (Array.isArray(data[0])) t = data[0].map((s) => (Array.isArray(s) && typeof s[0] === 'string') ? s[0] : '').join('');
+          } catch (e) { lastError = e.message || String(e); }
+        }
+        // 3) MyMemory
+        if (!t.trim()) {
+          try {
+            const src = from || (to === 'es' ? 'en' : 'es');
+            const res = await fetch(`https://api.mymemory.translated.net/get?q=${q}&langpair=${src}|${to}`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            const candidate = (data.responseData && data.responseData.translatedText) || '';
+            if (!/MYMEMORY WARNING|PLEASE SELECT TWO DISTINCT|QUERY LENGTH LIMIT|INVALID LANGUAGE PAIR/i.test(candidate)) t = candidate;
+          } catch (e) { lastError = e.message || String(e); }
+        }
+        if (!t.trim()) throw new Error('No se pudo traducir este texto. Revisa tu conexión o el idioma elegido. (' + lastError + ')');
+        out.push(t);
+      }
+      return out.join(' ');
+    }
+
+    // ---- Utilidades de imagen ----
+    function loadImage(blob) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('No se pudo cargar la imagen'));
+        img.src = URL.createObjectURL(blob);
+      });
+    }
+    function sampleBg(ctx, x, y, w, h) {
+      // Tomar el color de una franja limpia justo encima del renglón, no del texto.
+      const sh = Math.max(2, Math.min(10, Math.round(h * 0.5)));
+      let sy = Math.round(y - sh - 1);
+      if (sy < 0) sy = Math.round(y + h + 2);
+      if (sy < 0 || sy + sh > ctx.canvas.height) return '#ffffff';
+      const sx = Math.max(0, Math.round(x));
+      const sw = Math.max(1, Math.min(Math.round(w), ctx.canvas.width - sx));
+      const d = ctx.getImageData(sx, sy, sw, sh).data;
+      const pts = [];
+      for (let i = 0; i < d.length; i += 4) pts.push([d[i], d[i+1], d[i+2]]);
+      if (!pts.length) return '#ffffff';
+      const med = (k) => pts.map(p=>p[k]).sort((a,b)=>a-b)[Math.floor(pts.length/2)];
+      return `rgb(${med(0)},${med(1)},${med(2)})`;
+    }
+    function coverLine(ctx, line, bg) {
+      // Cubrir completamente el texto original, con un pequeño margen.
+      const x = Math.max(0, Math.floor(line.x - 2));
+      const y = Math.max(0, Math.floor(line.y - line.h - 2));
+      const w = Math.max(1, Math.min(Math.ceil(line.w + 5), ctx.canvas.width - x));
+      const h = Math.max(1, Math.min(Math.ceil(line.h + 6), ctx.canvas.height - y));
+      ctx.fillStyle = bg;
+      ctx.fillRect(x, y, w, h);
+    }
+    // Ajusta la traducción al hueco del texto original: reduce la fuente y,
+    // si hace falta, la parte en hasta dos líneas sin salirse del ancho.
+    function drawFittedText(ctx, text, x, baseline, maxWidth, maxHeight, baseSize, family, weight, color, align) {
+      const minSize = Math.max(6, Math.round(baseSize * 0.6));
+      ctx.textAlign = align || 'left';
+      const anchor = align === 'center' ? x + maxWidth / 2 : (align === 'right' ? x + maxWidth : x);
+      const wrap = (size) => {
+        ctx.font = `${weight || 400} ${size}px ${family}`;
+        const words = text.split(/\s+/).filter(Boolean);
+        const ls = [];
+        let cur = '';
+        for (const word of words) {
+          const test = cur ? cur + ' ' + word : word;
+          if (cur && ctx.measureText(test).width > maxWidth) { ls.push(cur); cur = word; }
+          else cur = test;
+        }
+        if (cur) ls.push(cur);
+        return ls;
+      };
+      let size = baseSize, lines = null;
+      for (; size >= minSize; size -= 0.5) {
+        const ls = wrap(size);
+        if (ls.length === 1 && ctx.measureText(text).width <= maxWidth) { lines = ls; break; }
+        if (ls.length * size * 1.08 <= maxHeight) { lines = ls; break; }
+      }
+      if (!lines) { size = minSize; lines = wrap(minSize); }
+      const lh = size * 1.08;
+      const shown = lines.slice(0, Math.max(1, Math.floor(maxHeight / lh)));
+      ctx.fillStyle = color || '#111';
+      shown.forEach((l, i) => ctx.fillText(l, anchor, baseline + i * lh));
+      ctx.textAlign = 'left';
+    }
+
+    // ---- OCR multilingüe: se reutiliza un worker por conjunto de idiomas ----
+    let ocrWorkerPromise = null;
+    let ocrWorkerKey = '';
+    function ocrLangs() {
+      const code = sourceSelect.value;
+      // "auto" carga varios idiomas frecuentes; elegir el idioma exacto
+      // mejora la precisión y reduce la descarga inicial.
+      return code === 'auto' ? ['eng','spa','fra','deu','ita','por'] : [TESS_LANG[code] || 'eng'];
+    }
+    async function getOcrWorker(langs) {
+      if (!window.Tesseract) throw new Error('El OCR no está disponible (falta conexión a internet).');
+      const key = langs.join('+');
+      if (ocrWorkerPromise && ocrWorkerKey !== key) {
+        ocrWorkerPromise.then((w) => w.terminate()).catch(() => {});
+        ocrWorkerPromise = null;
+      }
+      if (!ocrWorkerPromise) {
+        ocrWorkerKey = key;
+        ocrWorkerPromise = Tesseract.createWorker(langs).catch((e) => {
+          ocrWorkerPromise = null;
+          throw e;
+        });
+      }
+      return ocrWorkerPromise;
+    }
+    function ocrLines(data, width) {
+      const out = [];
+      for (const it of (data && (data.lines || data.words)) || []) {
+        const str = (it.text || '').replace(/\s+/g, ' ').trim();
+        if (!str) continue;
+        const b = it.bbox || {};
+        const x = Number(b.x0) || 0;
+        const y0 = Number(b.y0) || 0;
+        const x1 = Number(b.x1) || Math.min(width, x + width / 2);
+        const y1 = Number(b.y1) || Math.min(width, y0 + 12);
+        out.push({ str, x, y: y1, w: Math.max(1, x1 - x), h: Math.max(1, y1 - y0) });
+      }
+      if (!out.length && data && data.text) {
+        data.text.split(/\n+/).map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
+          .forEach((str, i) => out.push({ str, x: 8, y: 24 + i * 18, w: Math.max(1, width - 16), h: 16 }));
+      }
+      return out;
+    }
+    function ocrWords(data, width) {
+      const out = [];
+      for (const it of (data && data.words) || []) {
+        const str = (it.text || '').replace(/\s+/g, ' ').trim();
+        if (!str) continue;
+        const b = it.bbox || {};
+        const x = Number(b.x0) || 0;
+        const y0 = Number(b.y0) || 0;
+        const x1 = Number(b.x1) || Math.min(width, x + width / 2);
+        const y1 = Number(b.y1) || Math.min(width, y0 + 12);
+        out.push({ str, x, y: y1, w: Math.max(1, x1 - x), h: Math.max(1, y1 - y0) });
+      }
+      return out;
+    }
+    function sampleTextColor(ctx, x, y, w, h, bg) {
+      const sx = Math.max(0, Math.floor(x)), sy = Math.max(0, Math.floor(y));
+      const sw = Math.max(1, Math.min(Math.floor(w), ctx.canvas.width - sx));
+      const sh = Math.max(1, Math.min(Math.floor(h), ctx.canvas.height - sy));
+      const d = ctx.getImageData(sx, sy, sw, sh).data;
+      const ref = (bg.match(/\d+/g) || ['255','255','255']).map(Number);
+      const pts = [];
+      for (let i = 0; i < d.length; i += 4) {
+        const dist = Math.abs(d[i]-ref[0]) + Math.abs(d[i+1]-ref[1]) + Math.abs(d[i+2]-ref[2]);
+        if (dist > 90) pts.push([d[i], d[i+1], d[i+2]]);
+      }
+      if (!pts.length) return '#111';
+      const med = (k) => pts.map(p=>p[k]).sort((a,b)=>a-b)[Math.floor(pts.length/2)];
+      return `rgb(${med(0)},${med(1)},${med(2)})`;
+    }
+    function pdfColor(c) {
+      if (!c) return '#111';
+      return `rgb(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)})`;
+    }
+    function fontFor(fontName) {
+      const style = fontStyleSelect.value;
+      if (style === 'sans') return { family: 'Arial, Helvetica, sans-serif', weight: 400 };
+      if (style === 'serif') return { family: 'Georgia, "Times New Roman", serif', weight: 400 };
+      if (style === 'bold') return { family: 'Arial, Helvetica, sans-serif', weight: 700 };
+      return {
+        family: /serif/i.test(fontName || '') ? 'Georgia, "Times New Roman", serif' : 'Arial, Helvetica, sans-serif',
+        weight: /bold/i.test(fontName || '') ? 700 : 400
+      };
+    }
+    function alignFor(box, width) {
+      const c = box.x + box.w / 2;
+      if (c > width * 0.62) return 'right';
+      if (c < width * 0.38) return 'left';
+      return 'center';
+    }
+    function wrapText(ctx, text, maxWidth) {
+      const lines = [];
+      let cur = '';
+      for (const w of text.split(/\s+/).filter(Boolean)) {
+        const test = cur ? cur + ' ' + w : w;
+        if (cur && ctx.measureText(test).width > maxWidth) { lines.push(cur); cur = w; }
+        else cur = test;
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    }
+
+    // ---- Método de la app de Windows: muestreo de fondo/tinta y líneas ----
+    function wToHex(r, g, b) {
+      const h = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+      return '#' + h(r) + h(g) + h(b);
+    }
+    function wDistance(a, b) { return Math.abs(a.r-b.r) + Math.abs(a.g-b.g) + Math.abs(a.b-b.b); }
+    function wLum(c) { return 0.2126*c.r + 0.7152*c.g + 0.0722*c.b; }
+    function wRead(ctx, x, y, w, h) {
+      const x0=Math.max(0,Math.floor(x)), y0=Math.max(0,Math.floor(y));
+      const x1=Math.min(ctx.canvas.width,Math.ceil(x+w)), y1=Math.min(ctx.canvas.height,Math.ceil(y+h));
+      if (x1<=x0||y1<=y0) return null;
+      try { return { data: ctx.getImageData(x0,y0,x1-x0,y1-y0).data, w:x1-x0, h:y1-y0 }; } catch { return null; }
+    }
+    function wParseHex(hex) {
+      const m=/^#?([0-9a-f]{6})$/i.exec((hex||'').trim());
+      if (!m) return {r:255,g:255,b:255};
+      const v=parseInt(m[1],16);
+      return {r:(v>>16)&255,g:(v>>8)&255,b:v&255};
+    }
+    function wBackground(ctx, x, y, w, h) {
+      const pad=4, area=wRead(ctx,x-pad,y-pad,w+pad*2,h+pad*2);
+      if (!area) return '#ffffff';
+      const samples=[], stepX=Math.max(1,Math.floor(area.w/24)), stepY=Math.max(1,Math.floor(area.h/12));
+      for (let px=0;px<area.w;px+=stepX) for (const py of [0,area.h-1]) {
+        const i=(py*area.w+px)*4;
+        if (area.data[i+3]>200) samples.push({r:area.data[i],g:area.data[i+1],b:area.data[i+2]});
+      }
+      for (let py=0;py<area.h;py+=stepY) for (const px of [0,area.w-1]) {
+        const i=(py*area.w+px)*4;
+        if (area.data[i+3]>200) samples.push({r:area.data[i],g:area.data[i+1],b:area.data[i+2]});
+      }
+      if (!samples.length) return '#ffffff';
+      const med=k=>samples.map(s=>s[k]).sort((a,b)=>a-b)[Math.floor(samples.length/2)];
+      return wToHex(med('r'),med('g'),med('b'));
+    }
+    function wInk(ctx, x, y, w, h, bg) {
+      const area=wRead(ctx,x,y,w,h); if (!area) return null;
+      const buckets=new Map(); let total=0;
+      const stepX=Math.max(1,Math.floor(area.w/120)), stepY=Math.max(1,Math.floor(area.h/24));
+      for (let py=0;py<area.h;py+=stepY) for (let px=0;px<area.w;px+=stepX) {
+        const i=(py*area.w+px)*4; if (area.data[i+3]<200) continue; total++;
+        const c={r:area.data[i],g:area.data[i+1],b:area.data[i+2]};
+        if (wDistance(c,bg)<90) continue;
+        const key=`${c.r>>4}-${c.g>>4}-${c.b>>4}`;
+        const b=buckets.get(key)||{count:0,r:0,g:0,b:0}; b.count++; b.r+=c.r; b.g+=c.g; b.b+=c.b; buckets.set(key,b);
+      }
+      const best=Array.from(buckets.values()).sort((a,b)=>b.count-a.count)[0];
+      if (!best||best.count/Math.max(1,total)<0.03) return null;
+      return wToHex(best.r/best.count,best.g/best.count,best.b/best.count);
+    }
+    function wUniform(ctx, x, y, w, h, bg) {
+      if (w<4) return true;
+      const area=wRead(ctx,x,y,w,h); if (!area) return false;
+      const stepX=Math.max(2,Math.floor(area.w/80)), stepY=Math.max(2,Math.floor(area.h/8));
+      let total=0, different=0;
+      for (let py=0;py<area.h;py+=stepY) for (let px=0;px<area.w;px+=stepX) {
+        const i=(py*area.w+px)*4; if (area.data[i+3]<200) continue; total++;
+        const c={r:area.data[i],g:area.data[i+1],b:area.data[i+2]};
+        if (wDistance(c,bg)>40) different++;
+      }
+      return total===0||different/total<0.01;
+    }
+    function wGroup(raw) {
+      const sorted=[...raw].sort((a,b)=>b.y-a.y), clusters=[];
+      for (const item of sorted) {
+        let best=null, bestDiff=Infinity;
+        for (const c of clusters) {
+          const diff=Math.abs(c.y-item.y), tol=Math.max(1.5,Math.max(c.height,item.height)*0.35);
+          if (diff<=tol&&diff<bestDiff) { best=c; bestDiff=diff; }
+        }
+        if (best) { best.items.push(item); best.height=Math.max(best.height,item.height); }
+        else clusters.push({y:item.y,height:item.height,items:[item]});
+      }
+      const lines=[];
+      for (const cluster of clusters) {
+        const items=[...cluster.items].sort((a,b)=>a.left-b.left);
+        let run=[];
+        for (const item of items) {
+          if (!run.length) { run=[item]; continue; }
+          const last=run[run.length-1], gap=item.left-(last.left+last.width);
+          const maxGap=Math.max(14,Math.max(last.height,item.height)*2.5);
+          const overlapTol=Math.max(4,Math.max(last.height,item.height));
+          const same=last.str.trim()===item.str.trim();
+          if ((gap<=maxGap&&gap>-overlapTol)||(gap<=maxGap&&same&&gap>-overlapTol*2)) run.push(item);
+          else { lines.push(run); run=[item]; }
+        }
+        if (run.length) lines.push(run);
+      }
+      return lines;
+    }
+    const W_EXTRA = new Set([0x20ac,0x201a,0x0192,0x201e,0x2026,0x2020,0x2021,0x02c6,0x2030,0x0160,0x2039,0x0152,0x017d,0x2018,0x2019,0x201c,0x201d,0x2022,0x2013,0x2014,0x02dc,0x2122,0x0161,0x203a,0x0153,0x017e,0x0178]);
+    const W_REPL = {'\u2192':'->','\u2190':'<-','\u2191':'^','\u2193':'v','\u2264':'<=','\u2265':'>=','\u2260':'!=','\u00b0':'o','\u2713':'v','\u2714':'v','\u25cf':'-','\u25aa':'-','\u00a0':' '};
+    function wSanitize(text) {
+      let out='';
+      for (const ch of text) {
+        const cp=ch.codePointAt(0)||0;
+        if (cp===9||cp===10||cp===13) out+=' ';
+        else if (cp>=32&&cp<=126) out+=ch;
+        else if (cp>=0xa0&&cp<=0xff) out+=ch;
+        else if (W_EXTRA.has(cp)) out+=ch;
+        else if (W_REPL[ch]) out+=W_REPL[ch];
+      }
+      return out.replace(/\s+/g,' ').trim();
+    }
+    async function wGeneratePdf(pages) {
+      const doc = await PDFLib.PDFDocument.create();
+      const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      for (const p of pages) {
+        const landscape = p.pageWidth >= p.pageHeight;
+        const w = landscape ? Math.max(p.pageWidth,p.pageHeight) : Math.min(p.pageWidth,p.pageHeight);
+        const h = landscape ? Math.min(p.pageWidth,p.pageHeight) : Math.max(p.pageWidth,p.pageHeight);
+        const page = doc.addPage([w,h]);
+        const png = await doc.embedPng(p.image);
+        page.drawImage(png,{x:0,y:0,width:w,height:h});
+        for (const item of p.items) {
+          const text=wSanitize(item.str||''); if (!text) continue;
+          const fontSize=item.height>0?item.height:10;
+          const bg=wParseHex(item.background), dark=wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255})<0.45;
+          const padX=1.5, ascent=fontSize*1.02, descent=fontSize*0.3;
+          page.drawRectangle({
+            x:Math.max(0,item.x-padX), y:item.y-descent,
+            width:Math.min(item.width+padX*2,p.pageWidth-item.x),
+            height:ascent+descent,
+            color:PDFLib.rgb(bg.r/255,bg.g/255,bg.b/255)
+          });
+          const widthAtOne=font.widthOfTextAtSize(text,1);
+          const available=Math.max(item.width,item.maxWidth||item.width);
+          const maxWidth=Math.max(available,fontSize*2)*1.02;
+          let size=Math.min(fontSize,maxWidth/Math.max(widthAtOne,0.0001));
+          const room=p.pageWidth-4-Math.max(0,item.x);
+          if (widthAtOne*size>room) size=room/Math.max(widthAtOne,0.0001);
+          if (size<3.5) size=3.5;
+          let tc=dark?{r:1,g:1,b:1}:{r:0.08,g:0.08,b:0.08};
+          const orig=item.color?wParseHex(item.color):null;
+          if (orig) {
+            const contrast=Math.abs(wLum({r:orig.r/255,g:orig.g/255,b:orig.b/255})-wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255}));
+            if (contrast>0.3) tc={r:orig.r/255,g:orig.g/255,b:orig.b/255};
+          }
+          try { page.drawText(text,{x:Math.max(0,item.x),y:item.y,size,font,color:PDFLib.rgb(tc.r,tc.g,tc.b)}); } catch {}
+        }
+      }
+      return new Blob([await doc.save()],{type:'application/pdf'});
+    }
+
+    function wReplaceLine(ctx, line, text) {
+      const x=Math.max(0,line.x-1), y=Math.max(0,line.y-1);
+      const w=Math.min(line.w+2,ctx.canvas.width-x), h=Math.min(line.h+2,ctx.canvas.height-y);
+      if (w<=0||h<=0) return;
+      const bg=wParseHex(wBackground(ctx,x,y,w,h));
+      const bgL=wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255});
+      const inkHex=wInk(ctx,x,y,w,h,bg);
+      const maxWidth=Math.max(1,w-3);
+      const words=text.split(/\s+/).filter(Boolean);
+      const wrap=(size)=>{
+        ctx.font=`bold ${size}px sans-serif`;
+        const out=[]; let cur='';
+        for (const word of words) {
+          const t=cur?cur+' '+word:word;
+          if (cur&&ctx.measureText(t).width>maxWidth) { out.push(cur); cur=word; }
+          else cur=t;
+        }
+        if (cur) out.push(cur);
+        return out;
+      };
+      let size=Math.max(6,Math.min(line.h,32));
+      let rows=wrap(size), attempts=0;
+      while ((rows.length>2||rows.some((r)=>ctx.measureText(r).width>maxWidth))&&size>6&&attempts<30) {
+        size-=0.5; rows=wrap(size); attempts++;
+      }
+      const widest=Math.max(1,...rows.map((r)=>ctx.measureText(r).width));
+      if (widest>maxWidth) { size=Math.max(4,size*maxWidth/widest); ctx.font=`bold ${size}px sans-serif`; }
+      ctx.fillStyle=wToHex(bg.r,bg.g,bg.b);
+      ctx.fillRect(x,y,w,h);
+      let color=inkHex?wParseHex(inkHex):(bgL<0.5?{r:255,g:255,b:255}:{r:0,g:0,b:0});
+      if (Math.abs(wLum({r:color.r/255,g:color.g/255,b:color.b/255})-bgL)<0.25) color=bgL<0.5?{r:255,g:255,b:255}:{r:0,g:0,b:0};
+      ctx.fillStyle=wToHex(color.r,color.g,color.b);
+      const lh=h/Math.max(1,rows.length);
+      rows.forEach((r,i)=>ctx.fillText(r,line.x,Math.min(ctx.canvas.height-2,line.y+h*0.78+i*lh)));
+    }
+
+    // ---- PDF: método idéntico al de la app de Windows ----
+    async function translatePdf(file, to) {
+      const from = sourceSelect.value === 'auto' ? '' : sourceSelect.value;
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const loadingTask = pdfjsLib.getDocument({ data: bytes });
+      const doc = await loadingTask.promise;
+      const total = Math.min(doc.numPages, MAX_PAGES);
+      if (doc.numPages > MAX_PAGES) showMsg(`El PDF tiene ${doc.numPages} páginas; se traducen las primeras ${MAX_PAGES} (límite en iPhone).`, 'error');
+      const pages = [];
+      let candidates = 0, changed = 0, ocrUsed = false;
+      for (let n = 1; n <= total; n++) {
+        setProgress(`Procesando página ${n} de ${total}…`);
+        const page = await doc.getPage(n);
+        const viewport = page.getViewport({ scale: 1 });
+        const maxSide = Math.max(viewport.width, viewport.height);
+        const scale = Math.max(1, Math.min(2, 3200 / maxSide));
+        const renderViewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(renderViewport.width); canvas.height = Math.floor(renderViewport.height);
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        await page.render({ canvas, canvasContext: ctx, viewport: renderViewport }).promise;
+        const content = await page.getTextContent();
+        const raw = [];
+        for (const item of content.items) {
+          if (!('str' in item) || typeof item.str !== 'string') continue;
+          const str = item.str.replace(/\s+/g, ' ').trim(); if (!str) continue;
+          const tx = item.transform[4] ?? 0, ty = item.transform[5] ?? 0;
+          const [vx, vy] = viewport.convertToViewportPoint(tx, ty);
+          const width = Math.max(1, item.width), height = Math.max(1, item.height), y = viewport.height - vy;
+          const dup = raw.some((r) => r.str === str && Math.abs(r.x-vx) < 2 && Math.abs(r.y-y) < 2 && Math.abs(r.width-width) < 2 && Math.abs(r.height-height) < 2);
+          if (dup) continue;
+          raw.push({ str, x: vx, y, width, height, left: vx, top: vy - height * 0.95 });
+        }
+        let items = [];
+        for (const line of wGroup(raw)) {
+          const str = line.map((i)=>i.str).join(' ').replace(/\s+/g,' ').trim();
+          if (!/\p{L}/u.test(str)) continue;
+          const height = Math.max(...line.map((i)=>i.height));
+          const left = Math.min(...line.map((i)=>i.left));
+          const right = Math.max(...line.map((i)=>i.left + i.width));
+          const top = Math.min(...line.map((i)=>i.top));
+          const baseline = Math.max(...line.map((i)=>i.y));
+          const background = wBackground(ctx, left*scale, top*scale, (right-left)*scale, height*1.25*scale);
+          const bgRgb = wParseHex(background);
+          const bandTop = top - height*0.4, bandBottom = top + height*1.6;
+          const obstacles = raw.filter((i)=>i.left >= right-1 && i.top < bandBottom && i.top + i.height*1.4 > bandTop);
+          const nextLeft = obstacles.length ? Math.min(...obstacles.map((i)=>i.left)) : viewport.width - 8;
+          let maxWidth = Math.max(right-left, nextLeft - left - 2);
+          if (maxWidth > right-left+2) {
+            const free = maxWidth - (right-left) - 2;
+            if (!wUniform(ctx, (right+2)*scale, top*scale, free*scale, height*1.25*scale, bgRgb)) maxWidth = (right-left)*1.02;
+          }
+          const color = wInk(ctx, left*scale, top*scale, (right-left)*scale, height*1.25*scale, bgRgb) || '';
+          items.push({ str, original: str, x:left, y:baseline, width:Math.max(1,right-left), maxWidth, height, background, color });
+        }
+        if (!items.length) {
+          setProgress(`Reconociendo texto de la página ${n}…`);
+          const worker = await getOcrWorker(ocrLangs());
+          const { data } = await worker.recognize(canvas);
+          const boxes = ocrLines(data, canvas.width);
+          if (!boxes.length) throw new Error(`No se encontró texto legible en la página ${n}.`);
+          ocrUsed = true;
+          for (const b of boxes) {
+            if (!/\p{L}/u.test(b.str)) continue;
+            const x = b.x/scale, y = b.y/scale, w = Math.max(1,b.w/scale), h = Math.max(3,b.h/scale);
+            const bg = wBackground(ctx, b.x, b.y-b.h, b.w, b.h);
+            items.push({ str:b.str, original:b.str, x, y, width:w, maxWidth:w, height:h, background:bg, color:wInk(ctx,b.x,b.y-b.h,b.w,b.h,wParseHex(bg))||'' });
+          }
+        }
+        const baseImage = canvas.toDataURL('image/png');
+        for (const item of items) {
+          if (!/\p{L}/u.test(item.str)) continue;
+          candidates++;
+          const t = await translateText(item.str, to, from);
+          if (!t.trim() || t.trim() === item.original.trim()) continue;
+          changed++;
+          item.str = t;
+          ctx.fillStyle = item.background;
+          ctx.fillRect(item.x*scale-2, (item.y-item.height)*scale-2, item.maxWidth*scale+4, item.height*1.35*scale+4);
+          const font = fontFor('');
+          drawFittedText(ctx, t, item.x*scale, item.y*scale, item.maxWidth*scale, item.height*1.4*scale, Math.max(8,item.height*scale), font.family, font.weight, item.color||'#111', 'left');
+        }
+        pages.push({ image: baseImage, preview: canvas.toDataURL('image/png'), pageWidth: viewport.width, pageHeight: viewport.height, items });
+      }
+      await doc.destroy();
+      setProgress('Generando el PDF…');
+      const bytesOut = await wGeneratePdf(pages);
+      let notice = null;
+      if (ocrUsed) notice = { text: 'PDF escaneado: se aplicó OCR antes de traducir.', cls: 'ok' };
+      if (candidates && !changed) notice = { text: 'No se detectaron cambios. Revisa el idioma de origen/destino o si el archivo tiene texto legible.', cls: 'error' };
+      if (from && from === to) notice = { text: 'El idioma de origen y el de destino son el mismo. Elige otro idioma de destino.', cls: 'error' };
+      return { blob: bytesOut, name: file.name.replace(/\.pdf$/i,'')+'_traducido.pdf', previews: pages.map(p=>p.preview), notice };
+    }
+
+    // ---- Imagen: OCR + traducción ----
+    async function translateImage(file, to) {
+      const from = sourceSelect.value === 'auto' ? '' : sourceSelect.value;
+      setProgress('Reconociendo texto…');
+      const img = await loadImage(file);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width || 800;
+      canvas.height = img.naturalHeight || img.height || 600;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const worker = await getOcrWorker(ocrLangs());
+      const { data } = await worker.recognize(canvas);
+      // De abajo hacia arriba para no borrar las traducciones ya dibujadas.
+      const boxes = ocrLines(data, canvas.width);
+      if (!boxes.length) throw new Error('No se encontró texto en la imagen.');
+      setProgress('Traduciendo…');
+      let candidates = 0, changed = 0;
+      for (const box of boxes) {
+        if (!/\p{L}/u.test(box.str)) continue;
+        candidates++;
+        const t = await translateText(box.str, to, from);
+        if (!t.trim() || t.trim() === box.str.trim()) continue;
+        changed++;
+        wReplaceLine(ctx, { x: box.x, y: box.y - box.h, w: box.w, h: box.h }, t);
+      }
+      let notice = candidates && !changed
+        ? { text: 'No se detectaron cambios. Revisa el idioma de origen/destino.', cls: 'error' }
+        : null;
+      if (from && from === to) notice = { text: 'El idioma de origen y el de destino son el mismo. Elige otro idioma de destino.', cls: 'error' };
+      const blob = await new Promise((res)=>canvas.toBlob(res, file.type || 'image/png'));
+      return { blob, name: file.name, previews: [canvas.toDataURL('image/png')], notice };
+    }
+
+    fileInput.addEventListener('change', () => {
+      const f = fileInput.files[0];
+      $('file-info').innerHTML = f ? `<div class="file"><b>${f.name}</b><small>${fmtSize(f.size)} · ${detectKind(f)==='pdf'?'PDF':'Imagen'}</small></div>` : 'Toca para elegir un PDF o una imagen';
+      previewBox.innerHTML=''; shareBtn.style.display='none'; downloadLink.style.display='none';
+      resultBox.classList.remove('on'); showMsg('');
+    });
+
+    translateBtn.addEventListener('click', async () => {
+      const f = fileInput.files[0];
+      if (!f) { showMsg('Elige un archivo primero.','error'); return; }
+      translateBtn.disabled = true;
+      msg.textContent='';
+      try {
+        const result = detectKind(f)==='pdf' ? await translatePdf(f, langSelect.value) : await translateImage(f, langSelect.value);
+        if (lastUrl) URL.revokeObjectURL(lastUrl);
+        const url = URL.createObjectURL(result.blob);
+        lastUrl = url;
+        previewBox.innerHTML = result.previews.map((src,i)=>`<img class="preview" src="${src}" alt="Página ${i+1}">`).join('');
+        resultBox.classList.add('on');
+        lastFile = new File([result.blob], result.name, { type: result.blob.type });
+        const canShare = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [lastFile] }));
+        shareBtn.style.display = canShare ? 'inline-flex' : 'none';
+        if (canShare) {
+          downloadLink.style.display = 'none';
+        } else {
+          downloadLink.href = url;
+          downloadLink.download = result.name;
+          downloadLink.style.display = 'inline-flex';
+        }
+        setOrientation(detectKind(f));
+        if (result.notice) {
+          showMsg(result.notice.text, result.notice.cls);
+        } else {
+          showMsg(canShare
+            ? (detectKind(f) === 'image'
+              ? 'Listo. Pulsa Compartir y elige Guardar imagen en Fotos.'
+              : 'Listo. Pulsa Compartir y elige Guardar en Archivos (iOS no permite guardar PDFs en Fotos).')
+            : 'Listo. Pulsa «Descargar archivo traducido» para guardarlo.', 'ok');
+        }
+      } catch (e) {
+        showMsg(e.message || String(e), 'error');
+      } finally { hideProgress(); translateBtn.disabled=false; }
+    });
+
+    shareBtn.addEventListener('click', async () => {
+      if (!lastFile) return;
+      try { await navigator.share({ files: [lastFile], title: lastFile.name }); }
+      catch (e) { if (e.name !== 'AbortError') showMsg('No se pudo compartir: ' + e.message, 'error'); }
+    });
+
+    $('theme').addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const next = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      $('theme').textContent = next === 'dark' ? '☾' : '☀';
+    });
+
+    // Actualización automática: si se publica una versión nueva, recargar una vez.
+    if ('serviceWorker' in navigator) {
+      const teniaControl = !!navigator.serviceWorker.controller;
+      let recargado = false;
+      const buscarActualizacion = () => navigator.serviceWorker.ready
+        .then((reg) => reg.update()).catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!teniaControl || recargado) return;
+        recargado = true;
+        location.reload();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) buscarActualizacion();
+      });
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then(buscarActualizacion).catch(() => {});
+    }
+  </script>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand"><span class="logo">L</span><div><h1>PDF Image Translator IOS <span class="version">V7</span></h1><p class="sub">Traduce PDFs e imágenes en tu iPhone, conservando el formato.</p></div></div>
+      <button class="btn secondary" id="theme" title="Cambiar tema">☀</button>
+    </header>
+
+    <section class="card">
+      <label class="drop" for="file">
+        <input id="file" type="file" accept="application/pdf,image/*">
+        <span id="file-info">Toca para elegir un PDF o una imagen</span>
+      </label>
+      <div class="row">
+        <label class="field"><span>Idioma del archivo</span><select id="source" aria-label="Idioma del archivo"></select></label>
+        <label class="field"><span>Traducir a</span><select id="lang" aria-label="Idioma de destino"></select></label>
+        <label class="field"><span>Estilo de letra</span><select id="fontstyle" aria-label="Estilo de letra"><option value="auto">Igual al original</option><option value="sans">Sans-serif</option><option value="serif">Serif</option><option value="bold">Negrita</option></select></label>
+        <button class="btn" id="translate">Traducir</button>
+      </div>
+      <div class="progress" id="progress"><div class="bar"><i></i></div><p class="msg" id="progress-text"></p></div>
+      <p class="msg" id="msg"></p>
+    </section>
+
+    <section class="card result" id="result">
+      <h2>Resultado</h2>
+      <p class="orientation" id="orientacion"></p>
+      <div id="preview"></div>
+      <div class="actions">
+        <button class="btn" id="share" type="button" style="display:none">Compartir / Guardar</button>
+        <a class="btn" id="download" href="#" download style="display:none">Guardar archivo traducido</a>
+      </div>
+      <p class="hint">El archivo se genera en el navegador y no se sube a ningún servidor. En iOS usa Compartir para guardarlo; en escritorio u otros navegadores usa el botón Descargar. Elige el idioma del archivo (o «Detectar idioma») y el destino, que por defecto es Español. Si la letra no se parece a la original, cambia «Estilo de letra». Los PDFs escaneados e imágenes se reconocen con OCR multilingüe; la primera vez descarga datos de idioma (requiere internet).</p>
+    </section>
+
+    <footer>
+      <span>PDF Image Translator IOS V7 · revisión 1 (27/11/2026) · Código abierto</span>
+      <span>Rev 1: diseño Cristal Claro con modo oscuro</span>
+      <span><a href="https://github.com/rserrano285-svg/PDF-Image-Translator-IOS" target="_blank" rel="noopener noreferrer">Repositorio en GitHub</a> · <a href="https://paypal.me/rene285serrano" target="_blank" rel="noopener noreferrer">Donar / Apoyar El Proyecto ♥</a></span>
+    </footer>
+  </main>
+</body>
+</html>
+
