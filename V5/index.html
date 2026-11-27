@@ -403,7 +403,8 @@
       $('theme').textContent = dark ? '☾' : '☀';
     });
 
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    // El parámetro obliga al navegador a descargar el sw.js actualizado.
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?rev=8').catch(()=>{});
   </script>
 </head>
 <body>
@@ -439,7 +440,8 @@
     </section>
 
     <footer>
-      <span>PDF Image Translator IOS V5 · Código abierto · Todo se procesa en tu dispositivo</span>
+      <span>PDF Image Translator IOS V5 · revisión 8 (26/11/2026) · Código abierto</span>
+      <span>Rev 8: OCR multilingüe · traducir al español · descarga de respaldo</span>
       <span><a href="https://github.com/rserrano285-svg/PDF-Image-Translator-IOS" target="_blank" rel="noopener noreferrer">Repositorio en GitHub</a> · <a href="https://paypal.me/rene285serrano" target="_blank" rel="noopener noreferrer">Donar / Apoyar El Proyecto ♥</a></span>
     </footer>
   </main>
