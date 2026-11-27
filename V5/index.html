@@ -85,6 +85,7 @@
     const fileInput = $('file');
     const langSelect = $('lang');
     const sourceSelect = $('source');
+    const fontStyleSelect = $('fontstyle');
     const translateBtn = $('translate');
     const previewBox = $('preview');
     const resultBox = $('result');
@@ -188,10 +189,12 @@
     }
     // Ajusta la traducción al hueco del texto original: reduce la fuente y,
     // si hace falta, la parte en hasta dos líneas sin salirse del ancho.
-    function drawFittedText(ctx, text, x, baseline, maxWidth, maxHeight, baseSize, family) {
+    function drawFittedText(ctx, text, x, baseline, maxWidth, maxHeight, baseSize, family, weight, color, align) {
       const minSize = Math.max(6, Math.round(baseSize * 0.6));
+      ctx.textAlign = align || 'left';
+      const anchor = align === 'center' ? x + maxWidth / 2 : (align === 'right' ? x + maxWidth : x);
       const wrap = (size) => {
-        ctx.font = `600 ${size}px ${family}`;
+        ctx.font = `${weight || 400} ${size}px ${family}`;
         const words = text.split(/\s+/).filter(Boolean);
         const ls = [];
         let cur = '';
@@ -212,8 +215,9 @@
       if (!lines) { size = minSize; lines = wrap(minSize); }
       const lh = size * 1.08;
       const shown = lines.slice(0, Math.max(1, Math.floor(maxHeight / lh)));
-      ctx.fillStyle = '#111';
-      shown.forEach((l, i) => ctx.fillText(l, x, baseline + i * lh));
+      ctx.fillStyle = color || '#111';
+      shown.forEach((l, i) => ctx.fillText(l, anchor, baseline + i * lh));
+      ctx.textAlign = 'left';
     }
 
     // ---- OCR multilingüe: se reutiliza un worker por conjunto de idiomas ----
@@ -259,6 +263,55 @@
       }
       return out;
     }
+    function ocrWords(data, width) {
+      const out = [];
+      for (const it of (data && data.words) || []) {
+        const str = (it.text || '').replace(/\s+/g, ' ').trim();
+        if (!str) continue;
+        const b = it.bbox || {};
+        const x = Number(b.x0) || 0;
+        const y0 = Number(b.y0) || 0;
+        const x1 = Number(b.x1) || Math.min(width, x + width / 2);
+        const y1 = Number(b.y1) || Math.min(width, y0 + 12);
+        out.push({ str, x, y: y1, w: Math.max(1, x1 - x), h: Math.max(1, y1 - y0) });
+      }
+      return out;
+    }
+    function sampleTextColor(ctx, x, y, w, h, bg) {
+      const sx = Math.max(0, Math.floor(x)), sy = Math.max(0, Math.floor(y));
+      const sw = Math.max(1, Math.min(Math.floor(w), ctx.canvas.width - sx));
+      const sh = Math.max(1, Math.min(Math.floor(h), ctx.canvas.height - sy));
+      const d = ctx.getImageData(sx, sy, sw, sh).data;
+      const ref = (bg.match(/\d+/g) || ['255','255','255']).map(Number);
+      const pts = [];
+      for (let i = 0; i < d.length; i += 4) {
+        const dist = Math.abs(d[i]-ref[0]) + Math.abs(d[i+1]-ref[1]) + Math.abs(d[i+2]-ref[2]);
+        if (dist > 90) pts.push([d[i], d[i+1], d[i+2]]);
+      }
+      if (!pts.length) return '#111';
+      const med = (k) => pts.map(p=>p[k]).sort((a,b)=>a-b)[Math.floor(pts.length/2)];
+      return `rgb(${med(0)},${med(1)},${med(2)})`;
+    }
+    function pdfColor(c) {
+      if (!c) return '#111';
+      return `rgb(${Math.round(c[0]*255)},${Math.round(c[1]*255)},${Math.round(c[2]*255)})`;
+    }
+    function fontFor(fontName) {
+      const style = fontStyleSelect.value;
+      if (style === 'sans') return { family: 'Arial, Helvetica, sans-serif', weight: 400 };
+      if (style === 'serif') return { family: 'Georgia, "Times New Roman", serif', weight: 400 };
+      if (style === 'bold') return { family: 'Arial, Helvetica, sans-serif', weight: 700 };
+      return {
+        family: /serif/i.test(fontName || '') ? 'Georgia, "Times New Roman", serif' : 'Arial, Helvetica, sans-serif',
+        weight: /bold/i.test(fontName || '') ? 700 : 400
+      };
+    }
+    function alignFor(box, width) {
+      const c = box.x + box.w / 2;
+      if (c > width * 0.62) return 'right';
+      if (c < width * 0.38) return 'left';
+      return 'center';
+    }
     function wrapText(ctx, text, maxWidth) {
       const lines = [];
       let cur = '';
@@ -299,7 +352,8 @@
             y: vp.height - item.transform[5]*sc,
             w: Math.max(1,item.width*sc),
             h: Math.max(1,item.height*sc),
-            fontName: item.fontName || ''
+            fontName: item.fontName || '',
+            color: item.color || null
           });
         }
         // agrupar en líneas
@@ -329,10 +383,9 @@
           changed++;
           const bg = sampleBg(ctx, line.x, line.y - line.h, line.w, line.h);
           coverLine(ctx, line, bg);
-          const family = /serif/i.test(line.fontName || '')
-            ? 'Georgia, "Times New Roman", serif'
-            : 'Arial, Helvetica, sans-serif';
-          drawFittedText(ctx, t, line.x, line.y, line.w + 2, line.h * 2.2, Math.max(8, line.h), family);
+          const font = fontFor(line.fontName);
+          drawFittedText(ctx, t, line.x, line.y, line.w + 2, line.h * 2.2,
+            Math.max(8, line.h), font.family, font.weight, pdfColor(line.color), alignFor(line, canvas.width));
         }
         pages.push({ img: canvas.toDataURL('image/png'), w: vp.width, h: vp.height });
       }
@@ -365,6 +418,7 @@
       const { data } = await worker.recognize(canvas);
       // De abajo hacia arriba para no borrar las traducciones ya dibujadas.
       const boxes = ocrLines(data, canvas.width).sort((a, b) => b.y - a.y);
+      const words = ocrWords(data, canvas.width);
       if (!boxes.length) throw new Error('No se encontró texto en la imagen.');
       setProgress('Traduciendo…');
       let candidates = 0, changed = 0;
@@ -375,8 +429,15 @@
         if (!t.trim() || t.trim() === box.str.trim()) continue;
         changed++;
         const bg = sampleBg(ctx, box.x, box.y - box.h, box.w, box.h);
-        coverLine(ctx, box, bg);
-        drawFittedText(ctx, t, box.x, box.y, box.w + 2, box.h * 2.2, Math.max(10, box.h), 'Arial, Helvetica, sans-serif');
+        const color = sampleTextColor(ctx, box.x, box.y - box.h, box.w, box.h, bg);
+        // Cubrir solo las palabras de la línea para no dañar el resto de la imagen.
+        const lineWords = words.filter((w) => w.y >= box.y - box.h - 4 && w.y <= box.y + 4 && w.x >= box.x - 3 && w.x <= box.x + box.w + 3);
+        for (const w of (lineWords.length ? lineWords : [box])) {
+          coverLine(ctx, w, sampleBg(ctx, w.x, w.y - w.h, w.w, w.h));
+        }
+        const font = fontFor('');
+        drawFittedText(ctx, t, box.x, box.y, box.w + 2, box.h * 2.2,
+          Math.max(10, box.h), font.family, font.weight, color, alignFor(box, canvas.width));
       }
       let notice = candidates && !changed
         ? { text: 'No se detectaron cambios. Revisa el idioma de origen/destino.', cls: 'error' }
@@ -456,7 +517,7 @@
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) buscarActualizacion();
       });
-      navigator.serviceWorker.register('./sw.js?rev=10', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?rev=11', { updateViaCache: 'none' })
         .then(buscarActualizacion).catch(() => {});
     }
   </script>
@@ -476,6 +537,7 @@
       <div class="row">
         <label class="field"><span>Idioma del archivo</span><select id="source" aria-label="Idioma del archivo"></select></label>
         <label class="field"><span>Traducir a</span><select id="lang" aria-label="Idioma de destino"></select></label>
+        <label class="field"><span>Estilo de letra</span><select id="fontstyle" aria-label="Estilo de letra"><option value="auto">Igual al original</option><option value="sans">Sans-serif</option><option value="serif">Serif</option><option value="bold">Negrita</option></select></label>
         <button class="btn" id="translate">Traducir</button>
       </div>
       <div class="progress" id="progress"><div class="bar"><i></i></div><p class="msg" id="progress-text"></p></div>
@@ -490,12 +552,12 @@
         <button class="btn" id="share" type="button" style="display:none">Compartir / Guardar</button>
         <a class="btn" id="download" href="#" download style="display:none">Descargar archivo traducido</a>
       </div>
-      <p class="hint">El archivo se genera en el navegador y no se sube a ningún servidor. En iOS usa Compartir para guardarlo; en escritorio u otros navegadores usa el botón Descargar. Elige el idioma del archivo (o «Detectar idioma») y el destino, que por defecto es Español. Los PDFs escaneados e imágenes se reconocen con OCR multilingüe antes de traducirse; la primera vez descarga datos de idioma (requiere internet).</p>
+      <p class="hint">El archivo se genera en el navegador y no se sube a ningún servidor. En iOS usa Compartir para guardarlo; en escritorio u otros navegadores usa el botón Descargar. Elige el idioma del archivo (o «Detectar idioma») y el destino, que por defecto es Español. Si la letra no se parece a la original, cambia «Estilo de letra». Los PDFs escaneados e imágenes se reconocen con OCR multilingüe; la primera vez descarga datos de idioma (requiere internet).</p>
     </section>
 
     <footer>
-      <span>PDF Image Translator IOS V5 · revisión 10 (26/11/2026) · Código abierto</span>
-      <span>Rev 10: el texto traducido reemplaza al original manteniendo el formato</span>
+      <span>PDF Image Translator IOS V5 · revisión 11 (26/11/2026) · Código abierto</span>
+      <span>Rev 11: color, alineación y estilo de letra del original · cubre solo las palabras</span>
       <span><a href="https://github.com/rserrano285-svg/PDF-Image-Translator-IOS" target="_blank" rel="noopener noreferrer">Repositorio en GitHub</a> · <a href="https://paypal.me/rene285serrano" target="_blank" rel="noopener noreferrer">Donar / Apoyar El Proyecto ♥</a></span>
     </footer>
   </main>
