@@ -1,4 +1,4 @@
-const CACHE = 'pdf-translator-v6-v13';
+const CACHE = 'pdf-translator-v6-v14';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

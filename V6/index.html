@@ -140,16 +140,40 @@
       const out = [];
       for (const chunk of chunks) {
         const sl = from || 'auto';
-        const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${to}&dt=t&q=${encodeURIComponent(chunk)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('No se pudo traducir (' + res.status + '). Revisa tu conexión.');
-        const data = await res.json();
-        let t = '';
-        if (Array.isArray(data[0])) {
-          t = typeof data[0][0] === 'string' ? data[0][0]
-            : (Array.isArray(data[0][0]) ? data[0][0].map((s) => s[0] || '').join('') : '');
-        } else if (typeof data[0] === 'string') t = data[0];
-        out.push(t || chunk);
+        const q = encodeURIComponent(chunk);
+        let t = '', lastError = '';
+        // 1) Google (clients5)
+        try {
+          const res = await fetch(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${to}&dt=t&q=${q}`);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          if (Array.isArray(data[0])) {
+            t = typeof data[0][0] === 'string' ? data[0][0]
+              : (Array.isArray(data[0][0]) ? data[0][0].map((s) => s[0] || '').join('') : '');
+          } else if (typeof data[0] === 'string') t = data[0];
+        } catch (e) { lastError = e.message || String(e); }
+        // 2) Google (translate.googleapis.com)
+        if (!t.trim()) {
+          try {
+            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${to}&dt=t&q=${q}`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (Array.isArray(data[0])) t = data[0].map((s) => (Array.isArray(s) && typeof s[0] === 'string') ? s[0] : '').join('');
+          } catch (e) { lastError = e.message || String(e); }
+        }
+        // 3) MyMemory
+        if (!t.trim()) {
+          try {
+            const src = from || (to === 'es' ? 'en' : 'es');
+            const res = await fetch(`https://api.mymemory.translated.net/get?q=${q}&langpair=${src}|${to}`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            const candidate = (data.responseData && data.responseData.translatedText) || '';
+            if (!/MYMEMORY WARNING|PLEASE SELECT TWO DISTINCT|QUERY LENGTH LIMIT|INVALID LANGUAGE PAIR/i.test(candidate)) t = candidate;
+          } catch (e) { lastError = e.message || String(e); }
+        }
+        if (!t.trim()) throw new Error('No se pudo traducir este texto. Revisa tu conexión o el idioma elegido. (' + lastError + ')');
+        out.push(t);
       }
       return out.join(' ');
     }
@@ -740,8 +764,8 @@
     </section>
 
     <footer>
-      <span>PDF Image Translator IOS V6 · revisión 13 (26/11/2026) · Código abierto</span>
-      <span>Rev 13: mismo método de renderizado que la app de Windows</span>
+      <span>PDF Image Translator IOS V6 · revisión 14 (27/11/2026) · Código abierto</span>
+      <span>Rev 14: respaldos de traducción y error visible si falla</span>
       <span><a href="https://github.com/rserrano285-svg/PDF-Image-Translator-IOS" target="_blank" rel="noopener noreferrer">Repositorio en GitHub</a> · <a href="https://paypal.me/rene285serrano" target="_blank" rel="noopener noreferrer">Donar / Apoyar El Proyecto ♥</a></span>
     </footer>
   </main>
