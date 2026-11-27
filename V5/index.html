@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
   <meta name="theme-color" content="#0d131b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -403,8 +405,23 @@
       $('theme').textContent = dark ? '☾' : '☀';
     });
 
-    // El parámetro obliga al navegador a descargar el sw.js actualizado.
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js?rev=8').catch(()=>{});
+    // Actualización automática: si se publica una versión nueva, recargar una vez.
+    if ('serviceWorker' in navigator) {
+      const teniaControl = !!navigator.serviceWorker.controller;
+      let recargado = false;
+      const buscarActualizacion = () => navigator.serviceWorker.ready
+        .then((reg) => reg.update()).catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!teniaControl || recargado) return;
+        recargado = true;
+        location.reload();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) buscarActualizacion();
+      });
+      navigator.serviceWorker.register('./sw.js?rev=9', { updateViaCache: 'none' })
+        .then(buscarActualizacion).catch(() => {});
+    }
   </script>
 </head>
 <body>
@@ -440,8 +457,8 @@
     </section>
 
     <footer>
-      <span>PDF Image Translator IOS V5 · revisión 8 (26/11/2026) · Código abierto</span>
-      <span>Rev 8: OCR multilingüe · traducir al español · descarga de respaldo</span>
+      <span>PDF Image Translator IOS V5 · revisión 9 (26/11/2026) · Código abierto</span>
+      <span>Rev 9: actualización automática · OCR multilingüe · traducir al español</span>
       <span><a href="https://github.com/rserrano285-svg/PDF-Image-Translator-IOS" target="_blank" rel="noopener noreferrer">Repositorio en GitHub</a> · <a href="https://paypal.me/rene285serrano" target="_blank" rel="noopener noreferrer">Donar / Apoyar El Proyecto ♥</a></span>
     </footer>
   </main>
