@@ -324,11 +324,192 @@
       return lines;
     }
 
-    // ---- PDF: renderizar, tapar el texto original y dibujar la traducción ----
+    // ---- Método de la app de Windows: muestreo de fondo/tinta y líneas ----
+    function wToHex(r, g, b) {
+      const h = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+      return '#' + h(r) + h(g) + h(b);
+    }
+    function wDistance(a, b) { return Math.abs(a.r-b.r) + Math.abs(a.g-b.g) + Math.abs(a.b-b.b); }
+    function wLum(c) { return 0.2126*c.r + 0.7152*c.g + 0.0722*c.b; }
+    function wRead(ctx, x, y, w, h) {
+      const x0=Math.max(0,Math.floor(x)), y0=Math.max(0,Math.floor(y));
+      const x1=Math.min(ctx.canvas.width,Math.ceil(x+w)), y1=Math.min(ctx.canvas.height,Math.ceil(y+h));
+      if (x1<=x0||y1<=y0) return null;
+      try { return { data: ctx.getImageData(x0,y0,x1-x0,y1-y0).data, w:x1-x0, h:y1-y0 }; } catch { return null; }
+    }
+    function wParseHex(hex) {
+      const m=/^#?([0-9a-f]{6})$/i.exec((hex||'').trim());
+      if (!m) return {r:255,g:255,b:255};
+      const v=parseInt(m[1],16);
+      return {r:(v>>16)&255,g:(v>>8)&255,b:v&255};
+    }
+    function wBackground(ctx, x, y, w, h) {
+      const pad=4, area=wRead(ctx,x-pad,y-pad,w+pad*2,h+pad*2);
+      if (!area) return '#ffffff';
+      const samples=[], stepX=Math.max(1,Math.floor(area.w/24)), stepY=Math.max(1,Math.floor(area.h/12));
+      for (let px=0;px<area.w;px+=stepX) for (const py of [0,area.h-1]) {
+        const i=(py*area.w+px)*4;
+        if (area.data[i+3]>200) samples.push({r:area.data[i],g:area.data[i+1],b:area.data[i+2]});
+      }
+      for (let py=0;py<area.h;py+=stepY) for (const px of [0,area.w-1]) {
+        const i=(py*area.w+px)*4;
+        if (area.data[i+3]>200) samples.push({r:area.data[i],g:area.data[i+1],b:area.data[i+2]});
+      }
+      if (!samples.length) return '#ffffff';
+      const med=k=>samples.map(s=>s[k]).sort((a,b)=>a-b)[Math.floor(samples.length/2)];
+      return wToHex(med('r'),med('g'),med('b'));
+    }
+    function wInk(ctx, x, y, w, h, bg) {
+      const area=wRead(ctx,x,y,w,h); if (!area) return null;
+      const buckets=new Map(); let total=0;
+      const stepX=Math.max(1,Math.floor(area.w/120)), stepY=Math.max(1,Math.floor(area.h/24));
+      for (let py=0;py<area.h;py+=stepY) for (let px=0;px<area.w;px+=stepX) {
+        const i=(py*area.w+px)*4; if (area.data[i+3]<200) continue; total++;
+        const c={r:area.data[i],g:area.data[i+1],b:area.data[i+2]};
+        if (wDistance(c,bg)<90) continue;
+        const key=`${c.r>>4}-${c.g>>4}-${c.b>>4}`;
+        const b=buckets.get(key)||{count:0,r:0,g:0,b:0}; b.count++; b.r+=c.r; b.g+=c.g; b.b+=c.b; buckets.set(key,b);
+      }
+      const best=Array.from(buckets.values()).sort((a,b)=>b.count-a.count)[0];
+      if (!best||best.count/Math.max(1,total)<0.03) return null;
+      return wToHex(best.r/best.count,best.g/best.count,best.b/best.count);
+    }
+    function wUniform(ctx, x, y, w, h, bg) {
+      if (w<4) return true;
+      const area=wRead(ctx,x,y,w,h); if (!area) return false;
+      const stepX=Math.max(2,Math.floor(area.w/80)), stepY=Math.max(2,Math.floor(area.h/8));
+      let total=0, different=0;
+      for (let py=0;py<area.h;py+=stepY) for (let px=0;px<area.w;px+=stepX) {
+        const i=(py*area.w+px)*4; if (area.data[i+3]<200) continue; total++;
+        const c={r:area.data[i],g:area.data[i+1],b:area.data[i+2]};
+        if (wDistance(c,bg)>40) different++;
+      }
+      return total===0||different/total<0.01;
+    }
+    function wGroup(raw) {
+      const sorted=[...raw].sort((a,b)=>b.y-a.y), clusters=[];
+      for (const item of sorted) {
+        let best=null, bestDiff=Infinity;
+        for (const c of clusters) {
+          const diff=Math.abs(c.y-item.y), tol=Math.max(1.5,Math.max(c.height,item.height)*0.35);
+          if (diff<=tol&&diff<bestDiff) { best=c; bestDiff=diff; }
+        }
+        if (best) { best.items.push(item); best.height=Math.max(best.height,item.height); }
+        else clusters.push({y:item.y,height:item.height,items:[item]});
+      }
+      const lines=[];
+      for (const cluster of clusters) {
+        const items=[...cluster.items].sort((a,b)=>a.left-b.left);
+        let run=[];
+        for (const item of items) {
+          if (!run.length) { run=[item]; continue; }
+          const last=run[run.length-1], gap=item.left-(last.left+last.width);
+          const maxGap=Math.max(14,Math.max(last.height,item.height)*2.5);
+          const overlapTol=Math.max(4,Math.max(last.height,item.height));
+          const same=last.str.trim()===item.str.trim();
+          if ((gap<=maxGap&&gap>-overlapTol)||(gap<=maxGap&&same&&gap>-overlapTol*2)) run.push(item);
+          else { lines.push(run); run=[item]; }
+        }
+        if (run.length) lines.push(run);
+      }
+      return lines;
+    }
+    const W_EXTRA = new Set([0x20ac,0x201a,0x0192,0x201e,0x2026,0x2020,0x2021,0x02c6,0x2030,0x0160,0x2039,0x0152,0x017d,0x2018,0x2019,0x201c,0x201d,0x2022,0x2013,0x2014,0x02dc,0x2122,0x0161,0x203a,0x0153,0x017e,0x0178]);
+    const W_REPL = {'\u2192':'->','\u2190':'<-','\u2191':'^','\u2193':'v','\u2264':'<=','\u2265':'>=','\u2260':'!=','\u00b0':'o','\u2713':'v','\u2714':'v','\u25cf':'-','\u25aa':'-','\u00a0':' '};
+    function wSanitize(text) {
+      let out='';
+      for (const ch of text) {
+        const cp=ch.codePointAt(0)||0;
+        if (cp===9||cp===10||cp===13) out+=' ';
+        else if (cp>=32&&cp<=126) out+=ch;
+        else if (cp>=0xa0&&cp<=0xff) out+=ch;
+        else if (W_EXTRA.has(cp)) out+=ch;
+        else if (W_REPL[ch]) out+=W_REPL[ch];
+      }
+      return out.replace(/\s+/g,' ').trim();
+    }
+    async function wGeneratePdf(pages) {
+      const doc = await PDFLib.PDFDocument.create();
+      const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      for (const p of pages) {
+        const landscape = p.pageWidth >= p.pageHeight;
+        const w = landscape ? Math.max(p.pageWidth,p.pageHeight) : Math.min(p.pageWidth,p.pageHeight);
+        const h = landscape ? Math.min(p.pageWidth,p.pageHeight) : Math.max(p.pageWidth,p.pageHeight);
+        const page = doc.addPage([w,h]);
+        const png = await doc.embedPng(p.image);
+        page.drawImage(png,{x:0,y:0,width:w,height:h});
+        for (const item of p.items) {
+          const text=wSanitize(item.str||''); if (!text) continue;
+          const fontSize=item.height>0?item.height:10;
+          const bg=wParseHex(item.background), dark=wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255})<0.45;
+          const padX=1.5, ascent=fontSize*1.02, descent=fontSize*0.3;
+          page.drawRectangle({
+            x:Math.max(0,item.x-padX), y:item.y-descent,
+            width:Math.min(item.width+padX*2,p.pageWidth-item.x),
+            height:ascent+descent,
+            color:PDFLib.rgb(bg.r/255,bg.g/255,bg.b/255)
+          });
+          const widthAtOne=font.widthOfTextAtSize(text,1);
+          const available=Math.max(item.width,item.maxWidth||item.width);
+          const maxWidth=Math.max(available,fontSize*2)*1.02;
+          let size=Math.min(fontSize,maxWidth/Math.max(widthAtOne,0.0001));
+          const room=p.pageWidth-4-Math.max(0,item.x);
+          if (widthAtOne*size>room) size=room/Math.max(widthAtOne,0.0001);
+          if (size<3.5) size=3.5;
+          let tc=dark?{r:1,g:1,b:1}:{r:0.08,g:0.08,b:0.08};
+          const orig=item.color?wParseHex(item.color):null;
+          if (orig) {
+            const contrast=Math.abs(wLum({r:orig.r/255,g:orig.g/255,b:orig.b/255})-wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255}));
+            if (contrast>0.3) tc={r:orig.r/255,g:orig.g/255,b:orig.b/255};
+          }
+          try { page.drawText(text,{x:Math.max(0,item.x),y:item.y,size,font,color:PDFLib.rgb(tc.r,tc.g,tc.b)}); } catch {}
+        }
+      }
+      return new Blob([await doc.save()],{type:'application/pdf'});
+    }
+
+    function wReplaceLine(ctx, line, text) {
+      const x=Math.max(0,line.x-1), y=Math.max(0,line.y-1);
+      const w=Math.min(line.w+2,ctx.canvas.width-x), h=Math.min(line.h+2,ctx.canvas.height-y);
+      if (w<=0||h<=0) return;
+      const bg=wParseHex(wBackground(ctx,x,y,w,h));
+      const bgL=wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255});
+      const inkHex=wInk(ctx,x,y,w,h,bg);
+      const maxWidth=Math.max(1,w-3);
+      const words=text.split(/\s+/).filter(Boolean);
+      const wrap=(size)=>{
+        ctx.font=`bold ${size}px sans-serif`;
+        const out=[]; let cur='';
+        for (const word of words) {
+          const t=cur?cur+' '+word:word;
+          if (cur&&ctx.measureText(t).width>maxWidth) { out.push(cur); cur=word; }
+          else cur=t;
+        }
+        if (cur) out.push(cur);
+        return out;
+      };
+      let size=Math.max(6,Math.min(line.h,32));
+      let rows=wrap(size), attempts=0;
+      while ((rows.length>2||rows.some((r)=>ctx.measureText(r).width>maxWidth))&&size>6&&attempts<30) {
+        size-=0.5; rows=wrap(size); attempts++;
+      }
+      const widest=Math.max(1,...rows.map((r)=>ctx.measureText(r).width));
+      if (widest>maxWidth) { size=Math.max(4,size*maxWidth/widest); ctx.font=`bold ${size}px sans-serif`; }
+      ctx.fillStyle=wToHex(bg.r,bg.g,bg.b);
+      ctx.fillRect(x,y,w,h);
+      let color=inkHex?wParseHex(inkHex):(bgL<0.5?{r:255,g:255,b:255}:{r:0,g:0,b:0});
+      if (Math.abs(wLum({r:color.r/255,g:color.g/255,b:color.b/255})-bgL)<0.25) color=bgL<0.5?{r:255,g:255,b:255}:{r:0,g:0,b:0};
+      ctx.fillStyle=wToHex(color.r,color.g,color.b);
+      const lh=h/Math.max(1,rows.length);
+      rows.forEach((r,i)=>ctx.fillText(r,line.x,Math.min(ctx.canvas.height-2,line.y+h*0.78+i*lh)));
+    }
+
+    // ---- PDF: método idéntico al de la app de Windows ----
     async function translatePdf(file, to) {
       const from = sourceSelect.value === 'auto' ? '' : sourceSelect.value;
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+      const loadingTask = pdfjsLib.getDocument({ data: bytes });
+      const doc = await loadingTask.promise;
       const total = Math.min(doc.numPages, MAX_PAGES);
       if (doc.numPages > MAX_PAGES) showMsg(`El PDF tiene ${doc.numPages} páginas; se traducen las primeras ${MAX_PAGES} (límite en iPhone).`, 'error');
       const pages = [];
@@ -336,72 +517,85 @@
       for (let n = 1; n <= total; n++) {
         setProgress(`Procesando página ${n} de ${total}…`);
         const page = await doc.getPage(n);
-        const vp = page.getViewport({ scale: 1.5 });
+        const viewport = page.getViewport({ scale: 1 });
+        const maxSide = Math.max(viewport.width, viewport.height);
+        const scale = Math.max(1, Math.min(2, 3200 / maxSide));
+        const renderViewport = page.getViewport({ scale });
         const canvas = document.createElement('canvas');
-        canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
+        canvas.width = Math.floor(renderViewport.width); canvas.height = Math.floor(renderViewport.height);
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        await page.render({ canvas, canvasContext: ctx, viewport: vp }).promise;
+        await page.render({ canvas, canvasContext: ctx, viewport: renderViewport }).promise;
         const content = await page.getTextContent();
         const raw = [];
         for (const item of content.items) {
-          if (!('str' in item) || !item.str.trim()) continue;
-          const sc = 1.5;
-          raw.push({
-            str: item.str.replace(/\s+/g,' ').trim(),
-            x: item.transform[4]*sc,
-            y: vp.height - item.transform[5]*sc,
-            w: Math.max(1,item.width*sc),
-            h: Math.max(1,item.height*sc),
-            fontName: item.fontName || '',
-            color: item.color || null
-          });
+          if (!('str' in item) || typeof item.str !== 'string') continue;
+          const str = item.str.replace(/\s+/g, ' ').trim(); if (!str) continue;
+          const tx = item.transform[4] ?? 0, ty = item.transform[5] ?? 0;
+          const [vx, vy] = viewport.convertToViewportPoint(tx, ty);
+          const width = Math.max(1, item.width), height = Math.max(1, item.height), y = viewport.height - vy;
+          const dup = raw.some((r) => r.str === str && Math.abs(r.x-vx) < 2 && Math.abs(r.y-y) < 2 && Math.abs(r.width-width) < 2 && Math.abs(r.height-height) < 2);
+          if (dup) continue;
+          raw.push({ str, x: vx, y, width, height, left: vx, top: vy - height * 0.95 });
         }
-        // agrupar en líneas
-        raw.sort((a,b)=>b.y-a.y || a.x-b.x);
-        let lines=[];
-        for (const it of raw) {
-          const cur=lines[lines.length-1];
-          if (cur && Math.abs(cur.y-it.y)<=Math.max(2,cur.h*.35) && it.x-(cur.x+cur.w)<=Math.max(10,cur.h*2.5)) {
-            cur.w = Math.max(cur.w, it.x+it.w-cur.x); cur.h = Math.max(cur.h,it.h);
-            cur.str += ' ' + it.str;
-          } else lines.push({...it});
+        let items = [];
+        for (const line of wGroup(raw)) {
+          const str = line.map((i)=>i.str).join(' ').replace(/\s+/g,' ').trim();
+          if (!/\p{L}/u.test(str)) continue;
+          const height = Math.max(...line.map((i)=>i.height));
+          const left = Math.min(...line.map((i)=>i.left));
+          const right = Math.max(...line.map((i)=>i.left + i.width));
+          const top = Math.min(...line.map((i)=>i.top));
+          const baseline = Math.max(...line.map((i)=>i.y));
+          const background = wBackground(ctx, left*scale, top*scale, (right-left)*scale, height*1.25*scale);
+          const bgRgb = wParseHex(background);
+          const bandTop = top - height*0.4, bandBottom = top + height*1.6;
+          const obstacles = raw.filter((i)=>i.left >= right-1 && i.top < bandBottom && i.top + i.height*1.4 > bandTop);
+          const nextLeft = obstacles.length ? Math.min(...obstacles.map((i)=>i.left)) : viewport.width - 8;
+          let maxWidth = Math.max(right-left, nextLeft - left - 2);
+          if (maxWidth > right-left+2) {
+            const free = maxWidth - (right-left) - 2;
+            if (!wUniform(ctx, (right+2)*scale, top*scale, free*scale, height*1.25*scale, bgRgb)) maxWidth = (right-left)*1.02;
+          }
+          const color = wInk(ctx, left*scale, top*scale, (right-left)*scale, height*1.25*scale, bgRgb) || '';
+          items.push({ str, original: str, x:left, y:baseline, width:Math.max(1,right-left), maxWidth, height, background, color });
         }
-        // PDF escaneado: no hay texto útil en la capa del PDF, reconocerlo con OCR.
-        if (!lines.some((l) => /\p{L}/u.test(l.str))) {
+        if (!items.length) {
           setProgress(`Reconociendo texto de la página ${n}…`);
           const worker = await getOcrWorker(ocrLangs());
           const { data } = await worker.recognize(canvas);
-          lines = ocrLines(data, canvas.width);
-          if (!lines.length) throw new Error(`No se encontró texto legible en la página ${n}.`);
+          const boxes = ocrLines(data, canvas.width);
+          if (!boxes.length) throw new Error(`No se encontró texto legible en la página ${n}.`);
           ocrUsed = true;
+          for (const b of boxes) {
+            if (!/\p{L}/u.test(b.str)) continue;
+            const x = b.x/scale, y = b.y/scale, w = Math.max(1,b.w/scale), h = Math.max(3,b.h/scale);
+            const bg = wBackground(ctx, b.x, b.y-b.h, b.w, b.h);
+            items.push({ str:b.str, original:b.str, x, y, width:w, maxWidth:w, height:h, background:bg, color:wInk(ctx,b.x,b.y-b.h,b.w,b.h,wParseHex(bg))||'' });
+          }
         }
-        for (const line of lines) {
-          if (!/\p{L}/u.test(line.str)) continue;
+        const baseImage = canvas.toDataURL('image/png');
+        for (const item of items) {
+          if (!/\p{L}/u.test(item.str)) continue;
           candidates++;
-          const t = await translateText(line.str, to, from);
-          if (!t.trim() || t.trim() === line.str.trim()) continue;
+          const t = await translateText(item.str, to, from);
+          if (!t.trim() || t.trim() === item.original.trim()) continue;
           changed++;
-          const bg = sampleBg(ctx, line.x, line.y - line.h, line.w, line.h);
-          coverLine(ctx, line, bg);
-          const font = fontFor(line.fontName);
-          drawFittedText(ctx, t, line.x, line.y, line.w + 2, line.h * 2.2,
-            Math.max(8, line.h), font.family, font.weight, pdfColor(line.color), alignFor(line, canvas.width));
+          item.str = t;
+          ctx.fillStyle = item.background;
+          ctx.fillRect(item.x*scale-2, (item.y-item.height)*scale-2, item.maxWidth*scale+4, item.height*1.35*scale+4);
+          const font = fontFor('');
+          drawFittedText(ctx, t, item.x*scale, item.y*scale, item.maxWidth*scale, item.height*1.4*scale, Math.max(8,item.height*scale), font.family, font.weight, item.color||'#111', 'left');
         }
-        pages.push({ img: canvas.toDataURL('image/png'), w: vp.width, h: vp.height });
+        pages.push({ image: baseImage, preview: canvas.toDataURL('image/png'), pageWidth: viewport.width, pageHeight: viewport.height, items });
       }
+      await doc.destroy();
       setProgress('Generando el PDF…');
-      const pdfDoc = await PDFLib.PDFDocument.create();
-      for (const p of pages) {
-        const png = await pdfDoc.embedPng(p.img);
-        const page = pdfDoc.addPage([p.w, p.h]);
-        page.drawImage(png, { x:0, y:0, width:p.w, height:p.h });
-      }
-      const bytesOut = await pdfDoc.save();
+      const bytesOut = await wGeneratePdf(pages);
       let notice = null;
       if (ocrUsed) notice = { text: 'PDF escaneado: se aplicó OCR antes de traducir.', cls: 'ok' };
       if (candidates && !changed) notice = { text: 'No se detectaron cambios. Revisa el idioma de origen/destino o si el archivo tiene texto legible.', cls: 'error' };
       if (from && from === to) notice = { text: 'El idioma de origen y el de destino son el mismo. Elige otro idioma de destino.', cls: 'error' };
-      return { blob: new Blob([bytesOut], {type:'application/pdf'}), name: file.name.replace(/\.pdf$/i,'')+'_traducido.pdf', previews: pages.map(p=>p.img), notice };
+      return { blob: bytesOut, name: file.name.replace(/\.pdf$/i,'')+'_traducido.pdf', previews: pages.map(p=>p.preview), notice };
     }
 
     // ---- Imagen: OCR + traducción ----
@@ -417,8 +611,7 @@
       const worker = await getOcrWorker(ocrLangs());
       const { data } = await worker.recognize(canvas);
       // De abajo hacia arriba para no borrar las traducciones ya dibujadas.
-      const boxes = ocrLines(data, canvas.width).sort((a, b) => b.y - a.y);
-      const words = ocrWords(data, canvas.width);
+      const boxes = ocrLines(data, canvas.width);
       if (!boxes.length) throw new Error('No se encontró texto en la imagen.');
       setProgress('Traduciendo…');
       let candidates = 0, changed = 0;
@@ -428,16 +621,7 @@
         const t = await translateText(box.str, to, from);
         if (!t.trim() || t.trim() === box.str.trim()) continue;
         changed++;
-        const bg = sampleBg(ctx, box.x, box.y - box.h, box.w, box.h);
-        const color = sampleTextColor(ctx, box.x, box.y - box.h, box.w, box.h, bg);
-        // Cubrir solo las palabras de la línea para no dañar el resto de la imagen.
-        const lineWords = words.filter((w) => w.y >= box.y - box.h - 4 && w.y <= box.y + 4 && w.x >= box.x - 3 && w.x <= box.x + box.w + 3);
-        for (const w of (lineWords.length ? lineWords : [box])) {
-          coverLine(ctx, w, sampleBg(ctx, w.x, w.y - w.h, w.w, w.h));
-        }
-        const font = fontFor('');
-        drawFittedText(ctx, t, box.x, box.y, box.w + 2, box.h * 2.2,
-          Math.max(10, box.h), font.family, font.weight, color, alignFor(box, canvas.width));
+        wReplaceLine(ctx, { x: box.x, y: box.y - box.h, w: box.w, h: box.h }, t);
       }
       let notice = candidates && !changed
         ? { text: 'No se detectaron cambios. Revisa el idioma de origen/destino.', cls: 'error' }
@@ -556,8 +740,8 @@
     </section>
 
     <footer>
-      <span>PDF Image Translator IOS V6 · revisión 12 (26/11/2026) · Código abierto</span>
-      <span>Rev 12: traducción al español respetando formato, color y estilo del original</span>
+      <span>PDF Image Translator IOS V6 · revisión 13 (26/11/2026) · Código abierto</span>
+      <span>Rev 13: mismo método de renderizado que la app de Windows</span>
       <span><a href="https://github.com/rserrano285-svg/PDF-Image-Translator-IOS" target="_blank" rel="noopener noreferrer">Repositorio en GitHub</a> · <a href="https://paypal.me/rene285serrano" target="_blank" rel="noopener noreferrer">Donar / Apoyar El Proyecto ♥</a></span>
     </footer>
   </main>
