@@ -453,42 +453,71 @@
       }
       return out.replace(/\s+/g,' ').trim();
     }
+    function wFitLines(ctx, text, maxWidth, size) {
+      const words = text.split(/\s+/).filter(Boolean);
+      const build = (fs) => {
+        ctx.font = 'bold ' + fs + 'px sans-serif';
+        const rows = []; let cur = '';
+        for (const word of words) {
+          const cand = cur ? cur + ' ' + word : word;
+          if (cur && ctx.measureText(cand).width > maxWidth) { rows.push(cur); cur = word; }
+          else cur = cand;
+        }
+        if (cur) rows.push(cur);
+        return rows;
+      };
+      let fs = size, rows = build(fs), guard = 0;
+      while ((rows.length > 2 || rows.some((r) => ctx.measureText(r).width > maxWidth)) && fs > 7 && guard < 30) {
+        fs -= 0.5; rows = build(fs); guard++;
+      }
+      const widest = Math.max(1, ...rows.map((r) => ctx.measureText(r).width));
+      if (widest > maxWidth) { fs = Math.max(6, fs * maxWidth / widest); rows = build(fs); }
+      return { lines: rows, size: fs };
+    }
+
     async function wGeneratePdf(pages) {
       const doc = await PDFLib.PDFDocument.create();
-      const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      const load = (src) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('No se pudo cargar la imagen de la pagina'));
+        img.src = src;
+      });
       for (const p of pages) {
         const landscape = p.pageWidth >= p.pageHeight;
         const w = landscape ? Math.max(p.pageWidth,p.pageHeight) : Math.min(p.pageWidth,p.pageHeight);
         const h = landscape ? Math.min(p.pageWidth,p.pageHeight) : Math.max(p.pageWidth,p.pageHeight);
-        const page = doc.addPage([w,h]);
-        const png = await doc.embedPng(p.image);
-        page.drawImage(png,{x:0,y:0,width:w,height:h});
+        const img = await load(p.image);
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth || Math.ceil(p.pageWidth);
+        c.height = img.naturalHeight || Math.ceil(p.pageHeight);
+        const ctx = c.getContext('2d');
+        if (!ctx) throw new Error('Canvas no disponible para generar el PDF');
+        ctx.drawImage(img,0,0);
+        const sx = c.width / p.pageWidth, sy = c.height / p.pageHeight;
         for (const item of p.items) {
-          const text=wSanitize(item.str||''); if (!text) continue;
-          const fontSize=item.height>0?item.height:10;
-          const bg=wParseHex(item.background), dark=wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255})<0.45;
-          const padX=1.5, ascent=fontSize*1.02, descent=fontSize*0.3;
-          page.drawRectangle({
-            x:Math.max(0,item.x-padX), y:item.y-descent,
-            width:Math.min(item.width+padX*2,p.pageWidth-item.x),
-            height:ascent+descent,
-            color:PDFLib.rgb(bg.r/255,bg.g/255,bg.b/255)
-          });
-          const widthAtOne=font.widthOfTextAtSize(text,1);
-          const available=Math.max(item.width,item.maxWidth||item.width);
-          const maxWidth=Math.max(available,fontSize*2)*1.02;
-          let size=Math.min(fontSize,maxWidth/Math.max(widthAtOne,0.0001));
-          const room=p.pageWidth-4-Math.max(0,item.x);
-          if (widthAtOne*size>room) size=room/Math.max(widthAtOne,0.0001);
-          if (size<3.5) size=3.5;
-          let tc=dark?{r:1,g:1,b:1}:{r:0.08,g:0.08,b:0.08};
-          const orig=item.color?wParseHex(item.color):null;
-          if (orig) {
-            const contrast=Math.abs(wLum({r:orig.r/255,g:orig.g/255,b:orig.b/255})-wLum({r:bg.r/255,g:bg.g/255,b:bg.b/255}));
-            if (contrast>0.3) tc={r:orig.r/255,g:orig.g/255,b:orig.b/255};
+          const text = String(item.str || '').replace(/\s+/g,' ').trim();
+          if (!text) continue;
+          const fontSize = Math.max(6, item.height > 0 ? item.height : 10);
+          const baselineTop = p.pageHeight - item.y;
+          const x = Math.max(0,(item.x - 1.5) * sx);
+          const yTop = (baselineTop - fontSize * 1.02) * sy;
+          const bg = item.background || '#ffffff';
+          ctx.fillStyle = bg;
+          ctx.fillRect(x, yTop, (item.width + 3) * sx, fontSize * 1.35 * sy);
+          const fitted = wFitLines(ctx, text, Math.max(20, (item.maxWidth || item.width) * sx * 1.04), fontSize * sy);
+          ctx.font = 'bold ' + fitted.size + 'px sans-serif';
+          const bgc = wParseHex(bg);
+          const dark = wLum({ r: bgc.r/255, g: bgc.g/255, b: bgc.b/255 }) < 0.5;
+          ctx.fillStyle = item.color || (dark ? '#ffffff' : '#111111');
+          const baseline = baselineTop * sy;
+          for (let i=0;i<fitted.lines.length;i++) {
+            ctx.fillText(fitted.lines[i], x + 2, baseline - fitted.size * 0.15 + i * fitted.size * 1.12);
           }
-          try { page.drawText(text,{x:Math.max(0,item.x),y:item.y,size,font,color:PDFLib.rgb(tc.r,tc.g,tc.b)}); } catch {}
         }
+        const png = await doc.embedPng(c.toDataURL('image/png'));
+        const page = doc.addPage([w,h]);
+        page.drawImage(png,{x:0,y:0,width:w,height:h});
       }
       return new Blob([await doc.save()],{type:'application/pdf'});
     }
