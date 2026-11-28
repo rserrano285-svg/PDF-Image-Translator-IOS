@@ -145,7 +145,7 @@
         let t = '', lastError = '';
         // 1) Google (clients5)
         try {
-          const res = await fetch(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${to}&dt=t&q=${q}`);
+          const res = await fetch(`https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${sl}&tl=${to}&dt=t&q=${q}`, { signal: AbortSignal.timeout(10000) });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           if (Array.isArray(data[0])) {
@@ -156,17 +156,17 @@
         // 2) Google (translate.googleapis.com)
         if (!t.trim()) {
           try {
-            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${to}&dt=t&q=${q}`);
+            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${to}&dt=t&q=${q}`, { signal: AbortSignal.timeout(10000) });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             if (Array.isArray(data[0])) t = data[0].map((s) => (Array.isArray(s) && typeof s[0] === 'string') ? s[0] : '').join('');
           } catch (e) { lastError = e.message || String(e); }
         }
         // 3) MyMemory
-        if (!t.trim()) {
+        if (!t.trim() && from) {
           try {
-            const src = from || (to === 'es' ? 'en' : 'es');
-            const res = await fetch(`https://api.mymemory.translated.net/get?q=${q}&langpair=${src}|${to}`);
+            const src = from;
+            const res = await fetch(`https://api.mymemory.translated.net/get?q=${q}&langpair=${src}|${to}`, { signal: AbortSignal.timeout(10000) });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             const candidate = (data.responseData && data.responseData.translatedText) || '';
@@ -598,7 +598,7 @@
         const page = await doc.getPage(n);
         const viewport = page.getViewport({ scale: 1 });
         const maxSide = Math.max(viewport.width, viewport.height);
-        const scale = Math.max(1, Math.min(2, 3200 / maxSide));
+        const scale = Math.min(2, Math.max(0.55, 2200 / maxSide));
         const renderViewport = page.getViewport({ scale });
         const canvas = document.createElement('canvas');
         canvas.width = Math.floor(renderViewport.width); canvas.height = Math.floor(renderViewport.height);
@@ -636,7 +636,8 @@
             if (!wUniform(ctx, (right+2)*scale, top*scale, free*scale, height*1.25*scale, bgRgb)) maxWidth = (right-left)*1.02;
           }
           const color = wInk(ctx, left*scale, top*scale, (right-left)*scale, height*1.25*scale, bgRgb) || '';
-          items.push({ str, original: str, x:left, y:baseline, width:Math.max(1,right-left), maxWidth, height, background, color });
+          // baseline esta en origen inferior (pdf); el canvas dibuja desde arriba.
+          items.push({ str, original: str, x:left, y:viewport.height-baseline, width:Math.max(1,right-left), maxWidth, height, background, color });
         }
         if (!items.length) {
           setProgress(`Reconociendo texto de la página ${n}…`);
@@ -661,9 +662,10 @@
           changed++;
           item.str = t;
           ctx.fillStyle = item.background;
-          ctx.fillRect(item.x*scale-2, (item.y-item.height)*scale-2, item.maxWidth*scale+4, item.height*1.35*scale+4);
+          const topCanvas = item.y * scale; // ya en origen superior
+          ctx.fillRect(item.x*scale-2, topCanvas-2, item.maxWidth*scale+4, item.height*1.35*scale+4);
           const font = fontFor('');
-          drawFittedText(ctx, t, item.x*scale, item.y*scale, item.maxWidth*scale, item.height*1.4*scale, Math.max(8,item.height*scale), font.family, font.weight, item.color||'#111', 'left');
+          drawFittedText(ctx, t, item.x*scale, topCanvas + item.height*scale*0.78, item.maxWidth*scale, item.height*1.4*scale, Math.max(8,item.height*scale), font.family, font.weight, item.color||'#111', 'left');
         }
         pages.push({ image: baseImage, preview: canvas.toDataURL('image/png'), pageWidth: viewport.width, pageHeight: viewport.height, items });
       }
@@ -674,7 +676,7 @@
       if (ocrUsed) notice = { text: 'PDF escaneado: se aplicó OCR antes de traducir.', cls: 'ok' };
       if (candidates && !changed) notice = { text: 'No se detectaron cambios. Revisa el idioma de origen/destino o si el archivo tiene texto legible.', cls: 'error' };
       if (from && from === to) notice = { text: 'El idioma de origen y el de destino son el mismo. Elige otro idioma de destino.', cls: 'error' };
-      return { blob: bytesOut, name: file.name.replace(/\.pdf$/i,'')+'_traducido.pdf', previews: pages.map(p=>p.preview), notice };
+      return { blob: bytesOut, name: file.name.replace(/\.pdf$/i,'')+'_traducido.pdf', previews: pages.slice(0, 5).map(p=>p.preview), notice };
     }
 
     // ---- Imagen: OCR por palabra + conservación de color y formato (V8) ----
@@ -750,7 +752,16 @@
 
     fileInput.addEventListener('change', () => {
       const f = fileInput.files[0];
-      $('file-info').innerHTML = f ? `<div class="file"><b>${f.name}</b><small>${fmtSize(f.size)} · ${detectKind(f)==='pdf'?'PDF':'Imagen'}</small></div>` : 'Toca para elegir un PDF o una imagen';
+      if (!f) {
+        $('file-info').textContent = 'Toca para elegir un PDF o una imagen';
+      } else {
+        const info = $('file-info');
+        info.replaceChildren();
+        const box = document.createElement('div'); box.className = 'file';
+        const name = document.createElement('b'); name.textContent = f.name;
+        const meta = document.createElement('small'); meta.textContent = fmtSize(f.size) + ' · ' + (detectKind(f) === 'pdf' ? 'PDF' : 'Imagen');
+        box.append(name, meta); info.appendChild(box);
+      }
       previewBox.innerHTML=''; shareBtn.style.display='none'; downloadLink.style.display='none';
       resultBox.classList.remove('on'); showMsg('');
     });
